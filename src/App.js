@@ -2,6 +2,7 @@ import React, { useRef, useState } from "react";
 import { BrowserRouter, Routes, Route, Link, useNavigate } from "react-router-dom";
 import "./App.css";
 import logo from "./images/ll 1.png";
+import heroPhoto from "./images/Lilly.jpg";
 
 import ProductsPage from "./pages/Products";
 
@@ -26,7 +27,6 @@ function App() {
 
 function Home({ logo }) {
   const aboutRef = useRef(null);
-  // const productsRef = useRef(null); // Removed product section reference
   const contactRef = useRef(null);
 
   const scrollTo = (ref) => {
@@ -39,12 +39,24 @@ function Home({ logo }) {
         logo={logo}
         showHomeLinks
         onAbout={() => scrollTo(aboutRef)}
-        // Remove onProducts handler since Products section doesn't exist
         onContact={() => scrollTo(contactRef)}
       />
 
       <main>
-        <Hero logo={logo} />
+      <div className="homepage-main-hero">
+  <div className="hero-content-wrap">
+    <Hero logo={logo} />
+  </div>
+
+  <div className="lilly-photo-section">
+    <img
+      src={heroPhoto}
+      alt="Lilly the mare, Laska Legacy"
+      className="lilly-photo"
+    />
+  </div>
+</div>
+
 
         <section ref={aboutRef} id="about">
           <About />
@@ -113,41 +125,44 @@ function Hero({ logo }) {
     <section className="hero section">
       <div className="hero-bg" aria-hidden="true" />
       <div className="hero-inner container">
-        <div className="hero-content">
-          <img
-            src={logo}
-            alt="Laska Legacy logo"
-            className="hero-logo"
-            width={72}
-            height={72}
-            style={{ width: "72px", height: "72px" }}
-          />
+        <div
+          className="hero-content hero-content-flex"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flexWrap: "wrap",
+            gap: "36px",
+          }}
+        >
+          <div style={{ flex: "1 1 320px", minWidth: 0 }}>
+            <img
+              src={logo}
+              alt="Laska Legacy logo"
+              className="hero-logo"
+              width={72}
+              height={72}
+              style={{ width: "72px", height: "72px" }}
+            />
 
-          <h1 className="hero-title section-title">
-            Handcrafted Western Tack Made for Real Riding
-          </h1>
+            <h1 className="hero-title section-title">
+              Handcrafted Western Tack Made for Real Riding
+            </h1>
 
-          <p className="hero-subtitle section-intro">
-            Laska Legacy is built around practical craftsmanship: tack that fits
-            well, wears well, and holds up under daily use. Each piece is made in
-            South Africa with careful finishing and an eye for function, comfort,
-            and clean lines.
-          </p>
+            <p className="hero-subtitle section-intro">
+              Laska Legacy is built around practical craftsmanship: tack that fits
+              well, wears well, and holds up under daily use. Each piece is made in
+              South Africa with careful finishing and an eye for function, comfort,
+              and clean lines.
+            </p>
 
-          <div className="hero-buttons">
-            <Link to="/products" className="cta-button">
-              View Products
-            </Link>
-            <a href="#contact" className="cta-alt">
-              Get in Touch
-            </a>
-          </div>
-
-          <div className="trust-tags" aria-label="Highlights">
-            <span className="trust-tag">Made in South Africa</span>
-            <span className="trust-tag">Custom options</span>
-            <span className="trust-tag">Practical finishes</span>
-            <span className="trust-tag">Rider-led build</span>
+            <div className="hero-buttons">
+              <Link to="/products" className="cta-button">
+                View Products
+              </Link>
+              <a href="#contact" className="cta-alt">
+                Get in Touch
+              </a>
+            </div>
           </div>
         </div>
       </div>
