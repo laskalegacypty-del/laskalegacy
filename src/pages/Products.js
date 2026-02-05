@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import "./Products.css";
 
 // Images live inside: src/pages/ProductImages/
