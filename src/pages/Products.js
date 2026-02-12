@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
+import { Link } from "react-router-dom";
 import "./Products.css";
 
 // Images live inside: src/pages/ProductImages/
@@ -211,6 +212,11 @@ export default function ProductsPage() {
         <p className="products-intro">
           Handcrafted western tack and accessories, made in South Africa. Pricing shown is base pricing. Custom options available on request.
         </p>
+        <div style={{ marginBottom: "32px" }}>
+          <Link to="/inquiry" className="cta-button" style={{ display: "inline-block" }}>
+            Place an Order
+          </Link>
+        </div>
 
         {Object.entries(productsByCategory).map(([category, items]) => (
           <CategorySection

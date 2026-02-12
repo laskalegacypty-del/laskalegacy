@@ -7,6 +7,7 @@ import heroPhoto from "./images/Lilly.jpg";
 import ProductsPage from "./pages/Products";
 import Footer from "./components/Footer";
 import GalleryPage from "./pages/Gallery";
+import InquiryPage from "./pages/Inquiry";
 
 function App() {
   return (
@@ -30,6 +31,16 @@ function App() {
               <Navbar logo={logo} showHomeLinks={false} />
               <GalleryPage />
               <Footer />  
+            </>
+          }
+        />
+        <Route
+          path="/inquiry"
+          element={
+            <>
+              <Navbar logo={logo} showHomeLinks={false} />
+              <InquiryPage />
+              <Footer />
             </>
           }
         />
