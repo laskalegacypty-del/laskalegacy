@@ -8,15 +8,10 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" })
   }
 
-  const { id, status } = req.body
+  const { id, invoiceUrl } = req.body
 
-  if (!id || !status) {
-    return res.status(400).json({ error: "Inquiry ID and status required" })
-  }
-
-  const validStatuses = ["pending", "reviewed", "invoiced", "invoice-sent", "payment-received", "shipped"]
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ error: "Invalid status. Must be one of: " + validStatuses.join(", ") })
+  if (!id || !invoiceUrl) {
+    return res.status(400).json({ error: "Inquiry ID and invoice URL required" })
   }
 
   try {
@@ -33,8 +28,8 @@ export default async function handler(req, res) {
     const response = await fetch(blobs[0].url)
     const inquiry = await response.json()
 
-    // Update status
-    inquiry.status = status
+    // Update invoice URL
+    inquiry.invoiceUrl = invoiceUrl
 
     // Save back to blob
     await put(
@@ -48,7 +43,7 @@ export default async function handler(req, res) {
 
     return res.status(200).json({ success: true, inquiry })
   } catch (error) {
-    console.error("Error updating inquiry status:", error)
-    return res.status(500).json({ error: "Failed to update inquiry status" })
+    console.error("Error storing invoice URL:", error)
+    return res.status(500).json({ error: "Failed to store invoice URL" })
   }
 }

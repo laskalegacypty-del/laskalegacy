@@ -17,6 +17,19 @@
     .status-pending{background:#fff3cd;color:#856404}
     .status-reviewed{background:#d1ecf1;color:#0c5460}
     .status-invoiced{background:#d4edda;color:#155724}
+    .status-invoice-sent{background:#cfe2ff;color:#084298}
+    .status-payment-received{background:#d1e7dd;color:#0f5132}
+    .status-shipped{background:#d0d4f7;color:#3d3a8f}
+    .download-link{color:#0aa7a7;text-decoration:none;font-weight:600;margin-left:8px}
+    .download-link:hover{text-decoration:underline}
+    .status-select{padding:4px 8px;border-radius:6px;border:1px solid #ddd;font-size:0.85em;font-weight:600;cursor:pointer;background:#fff}
+    .status-select.status-pending{background:#fff3cd;color:#856404}
+    .status-select.status-invoice-sent{background:#cfe2ff;color:#084298}
+    .status-select.status-payment-received{background:#d1e7dd;color:#0f5132}
+    .status-select.status-shipped{background:#d0d4f7;color:#3d3a8f}
+    .status-select.status-invoiced{background:#d4edda;color:#155724}
+    .status-select.status-reviewed{background:#d1ecf1;color:#0c5460}
+    .status-select:focus{outline:2px solid #0aa7a7;outline-offset:2px}
     .btn-group{display:flex;gap:8px;flex-wrap:wrap}
     .btn-small{padding:6px 12px;font-size:0.9em;width:auto}
     .btn-secondary{background:#6c757d}
@@ -144,10 +157,17 @@ async function loadInquiries(){
             ${new Date(inq.createdAt).toLocaleString()} | 
             ${inq.items.length} item(s) | 
             Total: R${inq.totals.total.toFixed(2)}
+            ${inq.invoiceUrl ? ` | <a href="${inq.invoiceUrl}" target="_blank" class="download-link">📄 Download Invoice</a>` : ''}
           </div>
         </div>
         <div class="btn-group">
-          <span class="status-badge status-${inq.status}">${inq.status}</span>
+          <select class="status-select status-${inq.status}" onchange="updateInquiryStatus('${inq.id}', this.value)">
+            <option value="pending" ${inq.status === 'pending' ? 'selected' : ''}>Pending</option>
+            <option value="invoice-sent" ${inq.status === 'invoice-sent' ? 'selected' : ''}>Invoice Sent</option>
+            <option value="payment-received" ${inq.status === 'payment-received' ? 'selected' : ''}>Payment Received</option>
+            <option value="shipped" ${inq.status === 'shipped' ? 'selected' : ''}>Shipped</option>
+            <option value="invoiced" ${inq.status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
+          </select>
           <button class="btn-small btn-secondary" onclick="viewInquiry('${inq.id}')">View Details</button>
           <button class="btn-small" onclick="generateInvoiceFromInquiry('${inq.id}')" ${inq.status === 'invoiced' ? 'disabled' : ''}>Generate Invoice</button>
         </div>
@@ -233,6 +253,11 @@ async function viewInquiry(id){
       </div>
 
       <div style="margin-top:20px">
+        ${inquiry.invoiceUrl ? `
+          <a href="${inquiry.invoiceUrl}" target="_blank" class="download-link" style="display:inline-block;margin-right:12px;padding:10px 16px;background:#0aa7a7;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">
+            📄 Download Invoice
+          </a>
+        ` : ''}
         <button onclick="generateInvoiceFromInquiry('${inquiry.id}')" ${inquiry.status === 'invoiced' ? 'disabled' : ''}>
           Generate Invoice
         </button>
@@ -286,6 +311,13 @@ async function generateInvoiceFromInquiry(id){
 
     const invoiceData = await invoiceR.json()
 
+    // Store invoice URL in inquiry
+    await fetch('/api/store-invoice-url', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id: inquiry.id, invoiceUrl: invoiceData.url })
+    })
+
     // Update inquiry status
     await fetch('/api/update-inquiry-status', {
       method: 'POST',
@@ -315,6 +347,47 @@ document.getElementById('inquiry-modal').addEventListener('click', function(e) {
     closeModal()
   }
 })
+
+function getStatusColor(status) {
+  const colors = {
+    'pending': '#fff3cd',
+    'invoice-sent': '#cfe2ff',
+    'payment-received': '#d1e7dd',
+    'shipped': '#d0d4f7',
+    'invoiced': '#d4edda',
+    'reviewed': '#d1ecf1'
+  }
+  return colors[status] || '#f8f9fa'
+}
+
+async function updateInquiryStatus(id, status) {
+  try {
+    const r = await fetch('/api/update-inquiry-status', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id, status })
+    })
+
+    if(!r.ok) {
+      const errorText = await r.text()
+      let errorMessage = 'Failed to update status'
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.error || errorMessage
+      } catch(e) {
+        errorMessage = errorText || errorMessage
+      }
+      throw new Error(errorMessage)
+    }
+
+    // Refresh inquiries list to show updated status
+    loadInquiries()
+  } catch(e) {
+    alert('Error updating status: ' + e.message)
+    // Reload to reset dropdown
+    loadInquiries()
+  }
+}
 </script>
 
 </body>
