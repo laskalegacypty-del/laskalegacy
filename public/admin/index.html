@@ -14,7 +14,7 @@
 
 <div id="login">
   <input id="pwd" type="password" placeholder="Password"/>
-  <button onclick="login()">Login</button>
+  <button onclick="doLogin()">Login</button>
 </div>
 
 <div id="panel" style="display:none">
@@ -34,17 +34,23 @@
 </div>
 
 <script>
-async function login(){
+async function doLogin(){
+  const loginDiv = document.getElementById('login')
+  const panelDiv = document.getElementById('panel')
+  const pwdInput = document.getElementById('pwd')
+
   const r = await fetch('/api/admin-login',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({password:pwd.value})
+    body: JSON.stringify({ password: pwdInput.value })
   })
 
   if(r.ok){
-    login.style.display='none'
-    panel.style.display='block'
-  } else alert("Wrong password")
+    loginDiv.style.display='none'
+    panelDiv.style.display='block'
+  } else {
+    alert("Wrong password")
+  }
 }
 
 async function createInvoice(){
