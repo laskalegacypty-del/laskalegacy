@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Laska Legacy Admin</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <style>
+    body{font-family:sans-serif;max-width:800px;margin:40px auto}
+    input,select,button{padding:10px;margin:6px 0;width:100%}
+  </style>
+</head>
+<body>
+
+<h2>Laska Legacy Admin</h2>
+
+<div id="login">
+  <input id="pwd" type="password" placeholder="Password"/>
+  <button onclick="login()">Login</button>
+</div>
+
+<div id="panel" style="display:none">
+  <h3>Create Invoice</h3>
+
+  <textarea id="items" rows="6"
+  placeholder='[{"name":"Leather Belt + Buckle","qty":2}]'></textarea>
+
+  <select id="route">
+    <option value="locker-locker">Locker → Locker</option>
+    <option value="locker-door">Locker → Door</option>
+  </select>
+
+  <button onclick="createInvoice()">Generate Invoice</button>
+
+  <p id="result"></p>
+</div>
+
+<script>
+async function login(){
+  const r = await fetch('/api/admin-login',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({password:pwd.value})
+  })
+
+  if(r.ok){
+    login.style.display='none'
+    panel.style.display='block'
+  } else alert("Wrong password")
+}
+
+async function createInvoice(){
+  const r = await fetch('/api/create-invoice',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      items:JSON.parse(items.value),
+      route:route.value
+    })
+  })
+
+  const j = await r.json()
+  result.innerHTML = `<a href="${j.url}" target="_blank">Download Invoice</a>`
+}
+</script>
+
+</body>
+</html>
