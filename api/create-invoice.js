@@ -31,6 +31,11 @@ export default async function handler(req, res) {
     const products = loadProducts()
     const shipping = loadShipping()
 
+    // Validate required data
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ error: "Items array is required and cannot be empty" })
+    }
+
     // Calculate items and totals
     let productTotal = 0
     let shippingCost = 0
@@ -87,6 +92,12 @@ export default async function handler(req, res) {
     const doc = new PDFDocument({ size: "A4", margin: 50 })
     const chunks = []
     doc.on("data", (c) => chunks.push(c))
+    
+    // Set up promise to wait for PDF completion
+    const pdfPromise = new Promise((resolve, reject) => {
+      doc.on("end", resolve)
+      doc.on("error", reject)
+    })
 
     // Colors
     const teal = "#0aa7a7"
@@ -253,6 +264,9 @@ export default async function handler(req, res) {
       )
 
     doc.end()
+    
+    // Wait for PDF to finish generating
+    await pdfPromise
 
     const buffer = Buffer.concat(chunks)
 
@@ -263,6 +277,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ url: blob.url })
   } catch (error) {
     console.error("Error creating invoice:", error)
-    return res.status(500).json({ error: error.message || "Failed to create invoice" })
+    console.error("Error stack:", error.stack)
+    return res.status(500).json({ 
+      error: error.message || "Failed to create invoice",
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    })
   }
 }

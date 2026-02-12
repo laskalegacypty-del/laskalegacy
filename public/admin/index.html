@@ -272,7 +272,17 @@ async function generateInvoiceFromInquiry(id){
       })
     })
 
-    if(!invoiceR.ok) throw new Error('Failed to generate invoice')
+    if(!invoiceR.ok) {
+      const errorText = await invoiceR.text()
+      let errorMessage = 'Failed to generate invoice'
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.error || errorMessage
+      } catch(e) {
+        errorMessage = errorText || errorMessage
+      }
+      throw new Error(errorMessage)
+    }
 
     const invoiceData = await invoiceR.json()
 
