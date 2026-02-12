@@ -137,25 +137,47 @@ export default async function handler(req, res) {
         align: "right",
       })
 
-    if (inquiryId) {
-      doc.text(`Invoice #: ${inquiryId}`, 400, 150, { align: "right" })
-    }
+    // Generate random 3-digit invoice number
+    const invoiceNumber = Math.floor(100 + Math.random() * 900).toString()
+    doc.text(`Invoice #: ${invoiceNumber}`, 400, 150, { align: "right" })
 
     doc.moveDown(2)
 
     // Client details
+    let clientY = doc.y
     if (client) {
       doc
         .fontSize(12)
         .fillColor(textDark)
-        .text("Bill To:", 50, doc.y)
+        .text("Bill To:", 50, clientY)
+      
+      clientY += 18
+      doc
         .fontSize(10)
         .fillColor(textMuted)
-        .text(client.name, 50, doc.y + 5)
-        .text(client.email, 50, doc.y - 10)
-        .text(client.phone, 50, doc.y - 10)
-        .text(client.address, 50, doc.y - 10, { width: 200 })
-      doc.y += 60
+        .text(client.name, 50, clientY)
+      
+      clientY += 15
+      doc.text(client.email, 50, clientY)
+      
+      clientY += 15
+      doc.text(client.phone, 50, clientY)
+      
+      clientY += 15
+      // Split address into lines if it contains commas or is long
+      const addressLines = client.address.split(',').map(line => line.trim()).filter(line => line)
+      if (addressLines.length > 1) {
+        addressLines.forEach((line, index) => {
+          doc.text(line, 50, clientY + (index * 15), { width: 200 })
+        })
+        clientY += addressLines.length * 15
+      } else {
+        // If no commas, try to wrap long addresses
+        doc.text(client.address, 50, clientY, { width: 200 })
+        clientY += 15
+      }
+      
+      doc.y = clientY + 10
     }
 
     doc.moveDown()
@@ -219,12 +241,11 @@ export default async function handler(req, res) {
     }
 
     // Total section
-    doc.moveDown()
-    const totalY = yPos + 10
+    const totalY = yPos + 20
     doc
       .fillColor(tealDark)
       .rect(350, totalY, 200, 40)
-      .fillAndStroke(tealDark, tealDark)
+      .fill(tealDark)
       .fillColor("#ffffff")
       .fontSize(12)
       .text("Subtotal:", 360, totalY + 8)
@@ -240,16 +261,42 @@ export default async function handler(req, res) {
       })
 
     doc
-      .fillColor("#ffffff")
-      .rect(350, totalY + 40, 200, 35)
+      .fillColor(tealDark)
+      .rect(350, totalY + 40, 200, 40)
       .fill(tealDark)
-      .fontSize(14)
+      .fillColor("#ffffff")
+      .fontSize(16)
       .font("Helvetica-Bold")
-      .text("TOTAL:", 360, totalY + 48)
-      .text(`R${grandTotal.toFixed(2)}`, 460, totalY + 48, {
+      .text("TOTAL:", 360, totalY + 52)
+      .text(`R${grandTotal.toFixed(2)}`, 460, totalY + 52, {
         align: "right",
         width: 80,
       })
+
+    // Company information and bank details
+    const infoY = totalY + 100
+    doc
+      .font("Helvetica")
+      .fontSize(10)
+      .fillColor(textDark)
+      .text("Laska Legacy", 50, infoY)
+      .fontSize(9)
+      .fillColor(textMuted)
+      .text("Plot 50 Buffeldooring Potchefstroom", 50, infoY + 15)
+      .text("0725858288", 50, infoY + 30)
+      .text("laskalegacy@gmail.com", 50, infoY + 45)
+
+    // Bank details
+    doc
+      .fontSize(10)
+      .fillColor(textDark)
+      .text("Bank Details:", 50, infoY + 70)
+      .fontSize(9)
+      .fillColor(textMuted)
+      .text("FNB", 50, infoY + 85)
+      .text("Savings", 50, infoY + 100)
+      .text("62850552780", 50, infoY + 115)
+      .text(`Ref: Inv #${invoiceNumber}`, 50, infoY + 130)
 
     // Footer
     doc
@@ -257,7 +304,7 @@ export default async function handler(req, res) {
       .fontSize(8)
       .fillColor(textMuted)
       .text(
-        "Thank you for your order. For questions, contact laskalegacypty@gmail.com",
+        "Thank you for your order. For questions, contact laskalegacy@gmail.com",
         50,
         750,
         { align: "center", width: 500 }
