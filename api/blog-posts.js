@@ -91,13 +91,15 @@ export default async function handler(req, res) {
         }
 
         // Increment view count for published posts viewed by non-admin users
+        let updatedViews = post.views || 0
         if (!isAdmin && post.status === "published" && slug) {
           try {
             // Initialize views if it doesn't exist
             if (typeof post.views !== "number") {
               post.views = 0
             }
-            post.views = (post.views || 0) + 1
+            updatedViews = (post.views || 0) + 1
+            post.views = updatedViews
             post.updatedAt = new Date().toISOString()
 
             // Save updated post with view count
