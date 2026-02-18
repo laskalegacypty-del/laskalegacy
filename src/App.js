@@ -159,7 +159,7 @@ function Navbar({ logo, showHomeLinks = true, onAbout, onContact }) {
             </>
           )}
 
-          <Link to="/blog" className="nav-link">
+          <Link to="/blog" className="cta-button nav-cta">
             Between the Poles
           </Link>
 

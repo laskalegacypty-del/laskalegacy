@@ -84,20 +84,6 @@
   border-top: 1px solid #eee;
 }
 
-.rss-feed-link {
-  color: #0aa7a7;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 1.1rem;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.rss-feed-link:hover {
-  text-decoration: underline;
-}
-
 @media (max-width: 768px) {
   .blog-page {
     padding: 20px 16px;

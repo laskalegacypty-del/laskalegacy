@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import BlogPostCard from "../components/BlogPostCard";
 import BlogSearch from "../components/BlogSearch";
 import "./Blog.css";
@@ -106,9 +106,9 @@ export default function BlogPage() {
       )}
 
       <div className="blog-footer">
-        <a href="/api/feed?type=rss" className="rss-feed-link" target="_blank" rel="noopener noreferrer">
-          Subscribe to RSS Feed
-        </a>
+        <Link to="/" className="cta-button">
+          Back to Home
+        </Link>
       </div>
     </div>
   );
