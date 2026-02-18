@@ -450,6 +450,7 @@ async function loadBlogPosts(){
             By ${post.author} | 
             <span class="status-badge status-${post.status}">${post.status}</span>
             ${post.categories && post.categories.length > 0 ? ` | ${post.categories.join(', ')}` : ''}
+            ${typeof post.views === 'number' ? ` | 👁️ ${post.views} views` : ' | 👁️ 0 views'}
           </div>
         </div>
         <div class="btn-group">

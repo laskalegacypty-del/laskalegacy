@@ -67,6 +67,7 @@ export default async function handler(req, res) {
       try {
         const { blobs } = await list({ prefix: "blog/" })
         let post = null
+        let postBlob = null
 
         for (const blob of blobs) {
           try {
@@ -77,6 +78,7 @@ export default async function handler(req, res) {
                 return res.status(404).json({ error: "Post not found" })
               }
               post = candidate
+              postBlob = blob
               break
             }
           } catch (error) {
@@ -86,6 +88,27 @@ export default async function handler(req, res) {
 
         if (!post) {
           return res.status(404).json({ error: "Post not found" })
+        }
+
+        // Increment view count for published posts viewed by non-admin users
+        if (!isAdmin && post.status === "published" && slug) {
+          try {
+            // Initialize views if it doesn't exist
+            if (typeof post.views !== "number") {
+              post.views = 0
+            }
+            post.views = (post.views || 0) + 1
+            post.updatedAt = new Date().toISOString()
+
+            // Save updated post with view count
+            await put(postBlob.pathname, JSON.stringify(post, null, 2), {
+              access: "public",
+              contentType: "application/json",
+            })
+          } catch (error) {
+            console.error("Error updating view count:", error)
+            // Continue even if view count update fails
+          }
         }
 
         // Get related posts
