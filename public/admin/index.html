@@ -663,7 +663,7 @@ async function loadPendingComments(){
 
   try {
     // Get all blog posts to find comments
-    const postsR = await fetch('/api/get-blog-posts?status=all')
+    const postsR = await fetch('/api/blog-posts')
     if(!postsR.ok) throw new Error('Failed to load posts')
     const posts = await postsR.json()
     
