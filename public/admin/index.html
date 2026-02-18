@@ -175,7 +175,7 @@ async function loadInquiries(){
   listDiv.innerHTML = '<p>Loading...</p>'
 
   try {
-    const r = await fetch('/api/get-inquiries')
+    const r = await fetch('/api/inquiries')
     if(!r.ok) throw new Error('Failed to load inquiries')
     
     const inquiries = await r.json()
@@ -216,7 +216,7 @@ async function loadInquiries(){
 
 async function viewInquiry(id){
   try {
-    const r = await fetch(`/api/get-inquiry?id=${id}`)
+    const r = await fetch(`/api/inquiries?id=${id}`)
     if(!r.ok) throw new Error('Failed to load inquiry')
     
     const inquiry = await r.json()
@@ -314,7 +314,7 @@ function closeModal(){
 async function generateInvoiceFromInquiry(id){
   try {
     // Get inquiry details
-    const r = await fetch(`/api/get-inquiry?id=${id}`)
+    const r = await fetch(`/api/inquiries?id=${id}`)
     if(!r.ok) throw new Error('Failed to load inquiry')
     
     const inquiry = await r.json()

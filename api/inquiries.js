@@ -8,6 +8,8 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: "Unauthorized" })
   }
 
+  const { id } = req.query
+
   try {
     // List all inquiry files
     const { blobs } = await list({
@@ -28,10 +30,20 @@ export default async function handler(req, res) {
       })
     )
 
-    // Filter out nulls and sort by date (newest first)
-    const validInquiries = inquiries
-      .filter((inq) => inq !== null)
-      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    // Filter out nulls
+    const validInquiries = inquiries.filter((inq) => inq !== null)
+
+    // If ID is provided, return single inquiry
+    if (id) {
+      const inquiry = validInquiries.find((inq) => inq.id === id)
+      if (!inquiry) {
+        return res.status(404).json({ error: "Inquiry not found" })
+      }
+      return res.status(200).json(inquiry)
+    }
+
+    // Otherwise return all inquiries sorted by date (newest first)
+    validInquiries.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 
     return res.status(200).json(validInquiries)
   } catch (error) {
