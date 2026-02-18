@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import CommentForm from "./CommentForm";
 import "./Comments.css";
 
@@ -7,7 +7,7 @@ export default function Comments({ postId }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  const loadComments = async () => {
+  const loadComments = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -20,11 +20,11 @@ export default function Comments({ postId }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [postId]);
 
   useEffect(() => {
     loadComments();
-  }, [postId]);
+  }, [loadComments]);
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);

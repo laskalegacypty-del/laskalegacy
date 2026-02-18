@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import BlogPostCard from "../components/BlogPostCard";
 import BlogSearch from "../components/BlogSearch";
@@ -12,18 +12,7 @@ export default function BlogPage() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const [searchParams, setSearchParams] = useSearchParams();
 
-  useEffect(() => {
-    loadPosts();
-  }, [selectedCategory]);
-
-  useEffect(() => {
-    const categoryParam = searchParams.get("category");
-    if (categoryParam) {
-      setSelectedCategory(categoryParam);
-    }
-  }, [searchParams]);
-
-  const loadPosts = async () => {
+  const loadPosts = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -48,7 +37,18 @@ export default function BlogPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedCategory]);
+
+  useEffect(() => {
+    loadPosts();
+  }, [loadPosts]);
+
+  useEffect(() => {
+    const categoryParam = searchParams.get("category");
+    if (categoryParam) {
+      setSelectedCategory(categoryParam);
+    }
+  }, [searchParams]);
 
   const handleCategoryChange = (category) => {
     setSelectedCategory(category);

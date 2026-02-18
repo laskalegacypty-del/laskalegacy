@@ -15,6 +15,7 @@ export default function BlogSearch() {
       setQuery(urlQuery);
       performSearch(urlQuery);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const performSearch = useCallback(async (searchQuery) => {

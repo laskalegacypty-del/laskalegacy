@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { useParams, Link } from "react-router-dom";
 import Comments from "../components/Comments";
 import RelatedPosts from "../components/RelatedPosts";
@@ -10,9 +10,29 @@ export default function BlogPostPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  const loadPost = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`/api/get-blog-post?slug=${encodeURIComponent(slug)}`);
+      if (!response.ok) {
+        if (response.status === 404) {
+          throw new Error("Post not found");
+        }
+        throw new Error("Failed to load post");
+      }
+      const data = await response.json();
+      setPost(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [slug]);
+
   useEffect(() => {
     loadPost();
-  }, [slug]);
+  }, [loadPost]);
 
   // Set SEO meta tags
   useEffect(() => {
@@ -63,26 +83,6 @@ export default function BlogPostPage() {
       canonical.setAttribute("href", shareUrl);
     }
   }, [post]);
-
-  const loadPost = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const response = await fetch(`/api/get-blog-post?slug=${encodeURIComponent(slug)}`);
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error("Post not found");
-        }
-        throw new Error("Failed to load post");
-      }
-      const data = await response.json();
-      setPost(data);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
