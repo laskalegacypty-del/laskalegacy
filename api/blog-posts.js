@@ -158,6 +158,7 @@ export default async function handler(req, res) {
 
         return res.status(200).json({
           ...post,
+          views: updatedViews, // Include updated view count in response
           relatedPosts: relatedPosts.slice(0, 5),
         })
       } catch (error) {
