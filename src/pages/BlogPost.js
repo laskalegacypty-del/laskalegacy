@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { Helmet } from "react-helmet-async";
 import Comments from "../components/Comments";
 import RelatedPosts from "../components/RelatedPosts";
 import "./BlogPost.css";
@@ -14,6 +13,56 @@ export default function BlogPostPage() {
   useEffect(() => {
     loadPost();
   }, [slug]);
+
+  // Set SEO meta tags
+  useEffect(() => {
+    if (post) {
+      // Set document title
+      document.title = `${post.metaTitle || post.title} | Between the Poles - Laska Legacy`;
+
+      // Set or update meta tags
+      const setMetaTag = (name, content, isProperty = false) => {
+        const attribute = isProperty ? "property" : "name";
+        let meta = document.querySelector(`meta[${attribute}="${name}"]`);
+        if (!meta) {
+          meta = document.createElement("meta");
+          meta.setAttribute(attribute, name);
+          document.head.appendChild(meta);
+        }
+        meta.setAttribute("content", content);
+      };
+
+      setMetaTag("description", post.metaDescription || post.excerpt || "");
+      if (post.metaKeywords && post.metaKeywords.length > 0) {
+        setMetaTag("keywords", post.metaKeywords.join(", "));
+      }
+
+      const shareUrl = window.location.href;
+      setMetaTag("og:title", post.metaTitle || post.title, true);
+      setMetaTag("og:description", post.metaDescription || post.excerpt || "", true);
+      setMetaTag("og:type", "article", true);
+      setMetaTag("og:url", shareUrl, true);
+      if (post.featuredImage) {
+        setMetaTag("og:image", post.featuredImage, true);
+      }
+
+      setMetaTag("twitter:card", "summary_large_image");
+      setMetaTag("twitter:title", post.metaTitle || post.title);
+      setMetaTag("twitter:description", post.metaDescription || post.excerpt || "");
+      if (post.featuredImage) {
+        setMetaTag("twitter:image", post.featuredImage);
+      }
+
+      // Set canonical URL
+      let canonical = document.querySelector('link[rel="canonical"]');
+      if (!canonical) {
+        canonical = document.createElement("link");
+        canonical.setAttribute("rel", "canonical");
+        document.head.appendChild(canonical);
+      }
+      canonical.setAttribute("href", shareUrl);
+    }
+  }, [post]);
 
   const loadPost = async () => {
     try {
@@ -78,26 +127,7 @@ export default function BlogPostPage() {
   }
 
   return (
-    <>
-      <Helmet>
-        <title>{post.metaTitle || post.title} | Between the Poles - Laska Legacy</title>
-        <meta name="description" content={post.metaDescription || post.excerpt || ""} />
-        {post.metaKeywords && post.metaKeywords.length > 0 && (
-          <meta name="keywords" content={post.metaKeywords.join(", ")} />
-        )}
-        <meta property="og:title" content={post.metaTitle || post.title} />
-        <meta property="og:description" content={post.metaDescription || post.excerpt || ""} />
-        <meta property="og:type" content="article" />
-        <meta property="og:url" content={shareUrl} />
-        {post.featuredImage && <meta property="og:image" content={post.featuredImage} />}
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={post.metaTitle || post.title} />
-        <meta name="twitter:description" content={post.metaDescription || post.excerpt || ""} />
-        {post.featuredImage && <meta name="twitter:image" content={post.featuredImage} />}
-        <link rel="canonical" href={shareUrl} />
-      </Helmet>
-
-      <article className="blog-post-page">
+    <article className="blog-post-page">
         <Link to="/blog" className="blog-post-back-link">
           ← Back to Blog
         </Link>
@@ -162,6 +192,5 @@ export default function BlogPostPage() {
 
         <Comments postId={post.id} />
       </article>
-    </>
   );
 }
