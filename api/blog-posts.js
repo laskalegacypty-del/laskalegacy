@@ -258,6 +258,7 @@ export default async function handler(req, res) {
           : metaKeywords
           ? metaKeywords.split(",").map((k) => k.trim()).filter((k) => k)
           : [],
+        views: 0,
       }
 
       await put(`blog/${id}.json`, JSON.stringify(blogPost, null, 2), {
