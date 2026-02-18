@@ -27,7 +27,7 @@ export default function CommentForm({ postId, onCommentSubmitted }) {
     setMessage(null);
 
     try {
-      const response = await fetch("/api/submit-comment", {
+      const response = await fetch("/api/comments", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

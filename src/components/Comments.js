@@ -11,7 +11,7 @@ export default function Comments({ postId }) {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/get-comments?postId=${encodeURIComponent(postId)}`);
+      const response = await fetch(`/api/comments?postId=${encodeURIComponent(postId)}`);
       if (!response.ok) throw new Error("Failed to load comments");
       const data = await response.json();
       setComments(data.comments || []);

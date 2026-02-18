@@ -14,7 +14,7 @@ export default function BlogPostPage() {
     try {
       setLoading(true);
       setError(null);
-      const response = await fetch(`/api/get-blog-post?slug=${encodeURIComponent(slug)}`);
+      const response = await fetch(`/api/blog-posts?slug=${encodeURIComponent(slug)}`);
       if (!response.ok) {
         if (response.status === 404) {
           throw new Error("Post not found");

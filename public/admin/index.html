@@ -431,7 +431,7 @@ async function loadBlogPosts(){
   listDiv.innerHTML = '<p>Loading...</p>'
 
   try {
-    const r = await fetch('/api/get-blog-posts')
+    const r = await fetch('/api/blog-posts')
     if(!r.ok) throw new Error('Failed to load blog posts')
     
     const posts = await r.json()
@@ -600,11 +600,11 @@ async function saveBlogPost(event){
   }
   
   try {
-    const url = id ? '/api/update-blog-post' : '/api/create-blog-post'
+    const method = id ? 'PUT' : 'POST'
     const body = id ? { id, ...postData } : postData
     
-    const r = await fetch(url, {
-      method: 'POST',
+    const r = await fetch('/api/blog-posts', {
+      method: method,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     })
@@ -624,7 +624,7 @@ async function saveBlogPost(event){
 
 async function editBlogPost(id){
   try {
-    const r = await fetch(`/api/get-blog-post?id=${id}`)
+    const r = await fetch(`/api/blog-posts?id=${id}`)
     if(!r.ok) throw new Error('Failed to load post')
     const post = await r.json()
     showBlogForm(post)
@@ -637,10 +637,8 @@ async function deleteBlogPost(id){
   if(!confirm('Are you sure you want to delete this post?')) return
   
   try {
-    const r = await fetch('/api/delete-blog-post', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id })
+    const r = await fetch(`/api/blog-posts?id=${id}`, {
+      method: 'DELETE'
     })
     
     if(!r.ok) throw new Error('Failed to delete post')
@@ -716,7 +714,7 @@ async function loadPendingComments(){
 
 async function approveComment(postId, commentId, approved){
   try {
-    const r = await fetch('/api/approve-comment', {
+    const r = await fetch('/api/comments', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ postId, commentId, approved })
@@ -735,10 +733,8 @@ async function deleteComment(postId, commentId){
   if(!confirm('Are you sure you want to delete this comment?')) return
   
   try {
-    const r = await fetch('/api/delete-comment', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ postId, commentId })
+    const r = await fetch(`/api/comments?postId=${postId}&commentId=${commentId}`, {
+      method: 'DELETE'
     })
     
     if(!r.ok) throw new Error('Failed to delete comment')

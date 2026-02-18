@@ -17,8 +17,8 @@ export default function BlogPage() {
       setLoading(true);
       setError(null);
       const url = selectedCategory
-        ? `/api/get-blog-posts?category=${encodeURIComponent(selectedCategory)}`
-        : "/api/get-blog-posts";
+        ? `/api/blog-posts?category=${encodeURIComponent(selectedCategory)}`
+        : "/api/blog-posts";
       const response = await fetch(url);
       if (!response.ok) throw new Error("Failed to load posts");
       const data = await response.json();
@@ -106,7 +106,7 @@ export default function BlogPage() {
       )}
 
       <div className="blog-footer">
-        <a href="/api/rss-feed" className="rss-feed-link" target="_blank" rel="noopener noreferrer">
+        <a href="/api/feed?type=rss" className="rss-feed-link" target="_blank" rel="noopener noreferrer">
           Subscribe to RSS Feed
         </a>
       </div>
