@@ -249,14 +249,19 @@ async function viewInquiry(id){
 
     // Try to get invoice data if it exists
     let invoice = null
-    if (inquiry.invoiceUrl || inquiry.id) {
+    if (inquiry.id) {
       try {
         const invoiceR = await fetch(`/api/invoices?inquiryId=${inquiry.id}`)
         if (invoiceR.ok) {
           invoice = await invoiceR.json()
+        } else if (invoiceR.status === 404) {
+          // No invoice found yet - this is normal
+          invoice = null
+        } else {
+          console.error('Error fetching invoice:', invoiceR.status, invoiceR.statusText)
         }
       } catch(e) {
-        console.log('No invoice found for this inquiry')
+        console.error('Error fetching invoice:', e)
       }
     }
 
@@ -354,25 +359,23 @@ async function viewInquiry(id){
           <button onclick="generateInvoiceFromInquiry('${inquiry.id}')" ${inquiry.status === 'invoiced' ? 'disabled' : ''}>
             Generate Invoice
           </button>
-        ` : ''}
-        
-        ${invoice ? `
+        ` : `
           ${invoice.status === 'draft' ? `
-            <button onclick="approveInvoice('${invoice.id}', '${inquiry.id}')" style="background:#28a745">
+            <button onclick="approveInvoice('${invoice.id}', '${inquiry.id}')" style="background:#28a745;color:#fff;padding:10px 16px;border:none;border-radius:6px;font-weight:600;cursor:pointer">
               ✓ Approve Invoice
             </button>
           ` : ''}
           
           ${invoice.status === 'approved' || invoice.status === 'sent' ? `
-            <button onclick="sendInvoiceEmail('${invoice.id}', '${inquiry.id}')" style="background:#17a2b8">
+            <button onclick="sendInvoiceEmail('${invoice.id}', '${inquiry.id}')" style="background:#17a2b8;color:#fff;padding:10px 16px;border:none;border-radius:6px;font-weight:600;cursor:pointer">
               📧 ${invoice.status === 'sent' ? 'Resend' : 'Send'} Email to Client
             </button>
           ` : ''}
           
-          <a href="${invoice.pdfUrl || inquiry.invoiceUrl}" target="_blank" class="download-link" style="display:inline-block;padding:10px 16px;background:#0aa7a7;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">
+          <a href="${invoice.pdfUrl || inquiry.invoiceUrl}" target="_blank" style="display:inline-block;padding:10px 16px;background:#0aa7a7;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">
             📄 Download Invoice
           </a>
-        ` : ''}
+        `}
       </div>
     `
 
@@ -443,10 +446,12 @@ async function generateInvoiceFromInquiry(id){
     // Refresh inquiries list
     loadInquiries()
     
-    // Update modal if open
-    if(currentInquiry && currentInquiry.id === id) {
-      viewInquiry(id)
-    }
+    // Wait a moment for invoice to be stored, then refresh modal
+    setTimeout(() => {
+      if(currentInquiry && currentInquiry.id === id) {
+        viewInquiry(id)
+      }
+    }, 500)
   } catch(e) {
     alert('Error generating invoice: ' + e.message)
   }
@@ -480,9 +485,11 @@ async function approveInvoice(invoiceId, inquiryId){
     alert('Invoice approved successfully! You can now send it to the client.')
     
     // Refresh inquiry view
-    if(currentInquiry && currentInquiry.id === inquiryId) {
-      viewInquiry(inquiryId)
-    }
+    setTimeout(() => {
+      if(currentInquiry && currentInquiry.id === inquiryId) {
+        viewInquiry(inquiryId)
+      }
+    }, 300)
   } catch(e) {
     alert('Error approving invoice: ' + e.message)
   }
@@ -516,9 +523,11 @@ async function sendInvoiceEmail(invoiceId, inquiryId){
     alert('Invoice sent to client successfully!')
     
     // Refresh inquiry view
-    if(currentInquiry && currentInquiry.id === inquiryId) {
-      viewInquiry(inquiryId)
-    }
+    setTimeout(() => {
+      if(currentInquiry && currentInquiry.id === inquiryId) {
+        viewInquiry(inquiryId)
+      }
+    }, 300)
   } catch(e) {
     alert('Error sending email: ' + e.message)
   }
