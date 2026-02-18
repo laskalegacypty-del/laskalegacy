@@ -8,6 +8,8 @@ import ProductsPage from "./pages/Products";
 import Footer from "./components/Footer";
 import GalleryPage from "./pages/Gallery";
 import InquiryPage from "./pages/Inquiry";
+import BlogPage from "./pages/Blog";
+import BlogPostPage from "./pages/BlogPost";
 
 function App() {
   return (
@@ -40,6 +42,26 @@ function App() {
             <>
               <Navbar logo={logo} showHomeLinks={false} />
               <InquiryPage />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/blog"
+          element={
+            <>
+              <Navbar logo={logo} showHomeLinks={false} />
+              <BlogPage />
+              <Footer />
+            </>
+          }
+        />
+        <Route
+          path="/blog/:slug"
+          element={
+            <>
+              <Navbar logo={logo} showHomeLinks={false} />
+              <BlogPostPage />
               <Footer />
             </>
           }
@@ -136,6 +158,10 @@ function Navbar({ logo, showHomeLinks = true, onAbout, onContact }) {
               </button>
             </>
           )}
+
+          <Link to="/blog" className="nav-link">
+            Between the Poles
+          </Link>
 
           <Link to="/products" className="cta-button nav-cta">
             Shop the Collection
