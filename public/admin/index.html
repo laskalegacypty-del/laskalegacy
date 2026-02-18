@@ -185,7 +185,30 @@ async function loadInquiries(){
       return
     }
 
-    listDiv.innerHTML = inquiries.map(inq => `
+    // Fetch invoice data for each inquiry
+    const inquiriesWithInvoices = await Promise.all(inquiries.map(async (inq) => {
+      let invoice = null
+      if (inq.id) {
+        try {
+          const invoiceR = await fetch(`/api/get-invoice?inquiryId=${inq.id}`)
+          if (invoiceR.ok) {
+            invoice = await invoiceR.json()
+          }
+        } catch(e) {
+          // No invoice found, continue
+        }
+      }
+      return { ...inq, invoice }
+    }))
+
+    listDiv.innerHTML = inquiriesWithInvoices.map(inq => {
+      const invoiceStatusBadge = inq.invoice ? `
+        <span class="status-badge status-${inq.invoice.status === 'draft' ? 'pending' : inq.invoice.status === 'approved' ? 'reviewed' : inq.invoice.status === 'sent' ? 'invoice-sent' : 'payment-received'}" style="margin-left:8px">
+          Invoice: ${inq.invoice.status}${inq.invoice.invoiceNumber ? ` (${inq.invoice.invoiceNumber})` : ''}
+        </span>
+      ` : ''
+      
+      return `
       <div class="inquiry-item">
         <div class="inquiry-info">
           <div><strong>${inq.client.name}</strong> - ${inq.client.email}</div>
@@ -193,7 +216,8 @@ async function loadInquiries(){
             ${new Date(inq.createdAt).toLocaleString()} | 
             ${inq.items.length} item(s) | 
             Total: R${inq.totals.total.toFixed(2)}
-            ${inq.invoiceUrl ? ` | <a href="${inq.invoiceUrl}" target="_blank" class="download-link">📄 Download Invoice</a>` : ''}
+            ${invoiceStatusBadge}
+            ${inq.invoiceUrl || inq.invoice?.pdfUrl ? ` | <a href="${inq.invoice?.pdfUrl || inq.invoiceUrl}" target="_blank" class="download-link">📄 Download Invoice</a>` : ''}
           </div>
         </div>
         <div class="btn-group">
@@ -205,10 +229,11 @@ async function loadInquiries(){
             <option value="invoiced" ${inq.status === 'invoiced' ? 'selected' : ''}>Invoiced</option>
           </select>
           <button class="btn-small btn-secondary" onclick="viewInquiry('${inq.id}')">View Details</button>
-          <button class="btn-small" onclick="generateInvoiceFromInquiry('${inq.id}')" ${inq.status === 'invoiced' ? 'disabled' : ''}>Generate Invoice</button>
+          ${!inq.invoice ? `<button class="btn-small" onclick="generateInvoiceFromInquiry('${inq.id}')" ${inq.status === 'invoiced' ? 'disabled' : ''}>Generate Invoice</button>` : ''}
         </div>
       </div>
-    `).join('')
+    `
+    }).join('')
   } catch(e) {
     listDiv.innerHTML = '<p style="color:red">Error loading inquiries: ' + e.message + '</p>'
   }
@@ -222,6 +247,19 @@ async function viewInquiry(id){
     const inquiry = await r.json()
     currentInquiry = inquiry
 
+    // Try to get invoice data if it exists
+    let invoice = null
+    if (inquiry.invoiceUrl || inquiry.id) {
+      try {
+        const invoiceR = await fetch(`/api/get-invoice?inquiryId=${inquiry.id}`)
+        if (invoiceR.ok) {
+          invoice = await invoiceR.json()
+        }
+      } catch(e) {
+        console.log('No invoice found for this inquiry')
+      }
+    }
+
     const modal = document.getElementById('inquiry-modal')
     const detailDiv = document.getElementById('inquiry-detail')
 
@@ -232,6 +270,28 @@ async function viewInquiry(id){
       'kiosk-door': 'Kiosk → Door'
     }
 
+    // Invoice status badge HTML
+    let invoiceStatusHtml = ''
+    if (invoice) {
+      const statusColors = {
+        'draft': 'status-pending',
+        'approved': 'status-reviewed',
+        'sent': 'status-invoice-sent',
+        'paid': 'status-payment-received',
+        'overdue': 'status-pending',
+        'cancelled': 'status-pending'
+      }
+      invoiceStatusHtml = `
+        <div class="detail-row">
+          <div class="detail-label">Invoice Status</div>
+          <div class="detail-value">
+            <span class="status-badge ${statusColors[invoice.status] || 'status-pending'}">${invoice.status}</span>
+            ${invoice.invoiceNumber ? ` - ${invoice.invoiceNumber}` : ''}
+          </div>
+        </div>
+      `
+    }
+
     detailDiv.innerHTML = `
       <h2>Inquiry Details</h2>
       
@@ -239,6 +299,7 @@ async function viewInquiry(id){
         <div class="detail-label">Status</div>
         <div class="detail-value"><span class="status-badge status-${inquiry.status}">${inquiry.status}</span></div>
       </div>
+      ${invoiceStatusHtml}
 
       <div class="detail-row">
         <div class="detail-label">Client Information</div>
@@ -288,15 +349,30 @@ async function viewInquiry(id){
         </div>
       </div>
 
-      <div style="margin-top:20px">
-        ${inquiry.invoiceUrl ? `
-          <a href="${inquiry.invoiceUrl}" target="_blank" class="download-link" style="display:inline-block;margin-right:12px;padding:10px 16px;background:#0aa7a7;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">
+      <div style="margin-top:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+        ${!invoice ? `
+          <button onclick="generateInvoiceFromInquiry('${inquiry.id}')" ${inquiry.status === 'invoiced' ? 'disabled' : ''}>
+            Generate Invoice
+          </button>
+        ` : ''}
+        
+        ${invoice ? `
+          ${invoice.status === 'draft' ? `
+            <button onclick="approveInvoice('${invoice.id}', '${inquiry.id}')" style="background:#28a745">
+              ✓ Approve Invoice
+            </button>
+          ` : ''}
+          
+          ${invoice.status === 'approved' || invoice.status === 'sent' ? `
+            <button onclick="sendInvoiceEmail('${invoice.id}', '${inquiry.id}')" style="background:#17a2b8">
+              📧 ${invoice.status === 'sent' ? 'Resend' : 'Send'} Email to Client
+            </button>
+          ` : ''}
+          
+          <a href="${invoice.pdfUrl || inquiry.invoiceUrl}" target="_blank" class="download-link" style="display:inline-block;padding:10px 16px;background:#0aa7a7;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">
             📄 Download Invoice
           </a>
         ` : ''}
-        <button onclick="generateInvoiceFromInquiry('${inquiry.id}')" ${inquiry.status === 'invoiced' ? 'disabled' : ''}>
-          Generate Invoice
-        </button>
       </div>
     `
 
@@ -362,8 +438,7 @@ async function generateInvoiceFromInquiry(id){
     })
 
     // Show result
-    alert('Invoice generated! Download link: ' + invoiceData.url)
-    window.open(invoiceData.url, '_blank')
+    alert(`Invoice ${invoiceData.invoiceNumber || 'generated'}! Status: ${invoiceData.status || 'draft'}`)
     
     // Refresh inquiries list
     loadInquiries()
@@ -374,6 +449,78 @@ async function generateInvoiceFromInquiry(id){
     }
   } catch(e) {
     alert('Error generating invoice: ' + e.message)
+  }
+}
+
+async function approveInvoice(invoiceId, inquiryId){
+  if(!confirm('Are you sure you want to approve this invoice? Once approved, you can send it to the client.')) {
+    return
+  }
+
+  try {
+    const r = await fetch('/api/approve-invoice', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ id: invoiceId })
+    })
+
+    if(!r.ok) {
+      const errorText = await r.text()
+      let errorMessage = 'Failed to approve invoice'
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.error || errorMessage
+      } catch(e) {
+        errorMessage = errorText || errorMessage
+      }
+      throw new Error(errorMessage)
+    }
+
+    const result = await r.json()
+    alert('Invoice approved successfully! You can now send it to the client.')
+    
+    // Refresh inquiry view
+    if(currentInquiry && currentInquiry.id === inquiryId) {
+      viewInquiry(inquiryId)
+    }
+  } catch(e) {
+    alert('Error approving invoice: ' + e.message)
+  }
+}
+
+async function sendInvoiceEmail(invoiceId, inquiryId){
+  if(!confirm('Send this invoice to the client via email?')) {
+    return
+  }
+
+  try {
+    const r = await fetch('/api/send-invoice-email', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ invoiceId })
+    })
+
+    if(!r.ok) {
+      const errorText = await r.text()
+      let errorMessage = 'Failed to send email'
+      try {
+        const errorJson = JSON.parse(errorText)
+        errorMessage = errorJson.error || errorMessage
+      } catch(e) {
+        errorMessage = errorText || errorMessage
+      }
+      throw new Error(errorMessage)
+    }
+
+    const result = await r.json()
+    alert('Invoice sent to client successfully!')
+    
+    // Refresh inquiry view
+    if(currentInquiry && currentInquiry.id === inquiryId) {
+      viewInquiry(inquiryId)
+    }
+  } catch(e) {
+    alert('Error sending email: ' + e.message)
   }
 }
 

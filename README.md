@@ -1,6 +1,55 @@
-# Getting Started with Create React App
+# Laska Legacy - Invoice Management System
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+
+## Invoice System Setup
+
+The invoice system has been upgraded with sequential numbering, approval workflow, and email sending capabilities.
+
+### Required Environment Variables
+
+For the email sending feature to work, you need to configure the following environment variables:
+
+#### For Local Development:
+Create a `.env.local` file in the root directory with:
+
+```
+RESEND_API_KEY=re_your_api_key_here
+RESEND_FROM_EMAIL=Laska Legacy <noreply@laskalegacy.com>
+```
+
+#### For Vercel Deployment:
+1. Go to your Vercel project dashboard
+2. Navigate to Settings → Environment Variables
+3. Add the following variables:
+   - `RESEND_API_KEY`: Your Resend API key (get from https://resend.com/api-keys)
+   - `RESEND_FROM_EMAIL`: (Optional) Custom from email address. Default: "Laska Legacy <noreply@laskalegacy.com>"
+
+### Getting Resend API Key
+
+1. Sign up at [Resend](https://resend.com)
+2. Go to API Keys section
+3. Create a new API key
+4. Copy the key and add it to your environment variables
+
+### Invoice System Features
+
+- **Sequential Invoice Numbering**: Format `INV-YYYY-XXXX` (e.g., `INV-2025-0001`)
+- **Invoice Approval Workflow**: Draft → Approved → Sent
+- **Email Sending**: Automatically sends professional HTML emails with PDF attachments
+- **Invoice Management**: Track invoice status, history, and metadata
+- **Duplicate Prevention**: Prevents generating multiple invoices for the same inquiry
+
+### Invoice Workflow
+
+1. **Generate Invoice**: Creates invoice with status `draft`
+2. **Approve Invoice**: Admin approves invoice (status → `approved`)
+3. **Send Email**: Sends invoice to client via email (status → `sent`)
+4. **Download**: Invoice can be downloaded at any time
+
+---
+
+# Getting Started with Create React App
 
 ## Available Scripts
 

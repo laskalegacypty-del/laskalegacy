@@ -1,4 +1,4 @@
-import { put } from "@vercel/blob"
+import { put, list } from "@vercel/blob"
 import PDFDocument from "pdfkit"
 import fs from "fs"
 import path from "path"
@@ -15,6 +15,73 @@ function loadShipping() {
   return JSON.parse(raw)
 }
 
+// Get next sequential invoice number
+async function getNextInvoiceNumber() {
+  try {
+    // Try to get existing counter
+    const { blobs } = await list({ prefix: "invoice-counter.json" })
+    
+    let counter = { year: new Date().getFullYear(), number: 0 }
+    
+    if (blobs.length > 0) {
+      const response = await fetch(blobs[0].url)
+      counter = await response.json()
+      
+      // Reset counter if year changed
+      const currentYear = new Date().getFullYear()
+      if (counter.year !== currentYear) {
+        counter.year = currentYear
+        counter.number = 0
+      }
+    }
+    
+    // Increment counter
+    counter.number += 1
+    
+    // Save updated counter
+    await put("invoice-counter.json", JSON.stringify(counter, null, 2), {
+      access: "public",
+      contentType: "application/json",
+    })
+    
+    // Format: INV-YYYY-XXXX
+    const paddedNumber = counter.number.toString().padStart(4, "0")
+    return `INV-${counter.year}-${paddedNumber}`
+  } catch (error) {
+    console.error("Error getting invoice number:", error)
+    // Fallback to timestamp-based number
+    const year = new Date().getFullYear()
+    const timestamp = Date.now()
+    return `INV-${year}-${timestamp.toString().slice(-4)}`
+  }
+}
+
+// Check if invoice already exists for inquiry
+async function getExistingInvoice(inquiryId) {
+  if (!inquiryId) return null
+  
+  try {
+    const { blobs } = await list({ prefix: "invoices/" })
+    
+    for (const blob of blobs) {
+      try {
+        const response = await fetch(blob.url)
+        const invoice = await response.json()
+        if (invoice.inquiryId === inquiryId) {
+          return invoice
+        }
+      } catch (error) {
+        console.error(`Error loading invoice ${blob.pathname}:`, error)
+      }
+    }
+    
+    return null
+  } catch (error) {
+    console.error("Error checking for existing invoice:", error)
+    return null
+  }
+}
+
 export default async function handler(req, res) {
   if (!req.headers.cookie?.includes("admin=1")) return res.status(401).end()
 
@@ -26,6 +93,7 @@ export default async function handler(req, res) {
       client,
       shipping: shippingData,
       totals: totalsData,
+      forceRegenerate = false,
     } = req.body || {}
 
     const products = loadProducts()
@@ -34,6 +102,20 @@ export default async function handler(req, res) {
     // Validate required data
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ error: "Items array is required and cannot be empty" })
+    }
+
+    // Check for existing invoice if inquiryId provided
+    if (inquiryId && !forceRegenerate) {
+      const existingInvoice = await getExistingInvoice(inquiryId)
+      if (existingInvoice) {
+        return res.status(200).json({ 
+          url: existingInvoice.pdfUrl,
+          invoiceId: existingInvoice.id,
+          invoiceNumber: existingInvoice.invoiceNumber,
+          status: existingInvoice.status,
+          message: "Invoice already exists for this inquiry"
+        })
+      }
     }
 
     // Calculate items and totals
@@ -88,6 +170,11 @@ export default async function handler(req, res) {
 
     const grandTotal = productTotal + shippingCost
 
+    // Get sequential invoice number
+    const invoiceNumber = await getNextInvoiceNumber()
+    const invoiceDate = new Date().toISOString()
+    const dueDate = new Date(new Date(invoiceDate).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString()
+
     // Build PDF
     const doc = new PDFDocument({ size: "A4", margin: 50 })
     const chunks = []
@@ -127,19 +214,22 @@ export default async function handler(req, res) {
       .moveDown(2)
 
     // Invoice title and date
+    const invoiceDateFormatted = new Date(invoiceDate).toLocaleDateString("en-ZA")
+    const dueDateFormatted = new Date(dueDate).toLocaleDateString("en-ZA")
+    
     doc
       .fontSize(20)
       .fillColor(textDark)
       .text("INVOICE", 50, 130)
       .fontSize(10)
       .fillColor(textMuted)
-      .text(`Date: ${new Date().toLocaleDateString("en-ZA")}`, 400, 130, {
+      .text(`Date: ${invoiceDateFormatted}`, 400, 130, {
         align: "right",
       })
 
-    // Generate random 3-digit invoice number
-    const invoiceNumber = Math.floor(100 + Math.random() * 900).toString()
+    // Sequential invoice number
     doc.text(`Invoice #: ${invoiceNumber}`, 400, 150, { align: "right" })
+    doc.text(`Due Date: ${dueDateFormatted}`, 400, 165, { align: "right" })
 
     doc.moveDown(2)
 
@@ -317,11 +407,59 @@ export default async function handler(req, res) {
 
     const buffer = Buffer.concat(chunks)
 
-    const filename = inquiryId
-      ? `invoice-${inquiryId}.pdf`
-      : `invoice-${Date.now()}.pdf`
-    const blob = await put(filename, buffer, { access: "public" })
-    return res.status(200).json({ url: blob.url })
+    // Generate invoice ID
+    const invoiceId = inquiryId
+      ? `invoice-${inquiryId}`
+      : `invoice-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    const filename = `${invoiceId}.pdf`
+    const pdfBlob = await put(filename, buffer, { access: "public" })
+
+    // Create invoice metadata record
+    const invoiceRecord = {
+      id: invoiceId,
+      invoiceNumber,
+      invoiceDate,
+      dueDate,
+      status: "draft",
+      client: client || {},
+      items: lines.map(line => ({
+        name: line.name,
+        quantity: line.qty,
+        price: line.price,
+        lineTotal: line.lineTotal,
+      })),
+      totals: {
+        products: productTotal,
+        shipping: shippingCost,
+        total: grandTotal,
+      },
+      pdfUrl: pdfBlob.url,
+      inquiryId: inquiryId || null,
+      createdAt: invoiceDate,
+      updatedAt: invoiceDate,
+      statusHistory: [{
+        status: "draft",
+        changedAt: invoiceDate,
+      }],
+    }
+
+    // Store invoice metadata
+    await put(
+      `invoices/${invoiceId}.json`,
+      JSON.stringify(invoiceRecord, null, 2),
+      {
+        access: "public",
+        contentType: "application/json",
+      }
+    )
+
+    return res.status(200).json({ 
+      url: pdfBlob.url,
+      invoiceId,
+      invoiceNumber,
+      status: "draft",
+    })
   } catch (error) {
     console.error("Error creating invoice:", error)
     console.error("Error stack:", error.stack)
