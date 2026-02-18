@@ -190,7 +190,7 @@ async function loadInquiries(){
       let invoice = null
       if (inq.id) {
         try {
-          const invoiceR = await fetch(`/api/get-invoice?inquiryId=${inq.id}`)
+          const invoiceR = await fetch(`/api/invoices?inquiryId=${inq.id}`)
           if (invoiceR.ok) {
             invoice = await invoiceR.json()
           }
@@ -251,7 +251,7 @@ async function viewInquiry(id){
     let invoice = null
     if (inquiry.invoiceUrl || inquiry.id) {
       try {
-        const invoiceR = await fetch(`/api/get-invoice?inquiryId=${inquiry.id}`)
+        const invoiceR = await fetch(`/api/invoices?inquiryId=${inquiry.id}`)
         if (invoiceR.ok) {
           invoice = await invoiceR.json()
         }
@@ -424,17 +424,17 @@ async function generateInvoiceFromInquiry(id){
     const invoiceData = await invoiceR.json()
 
     // Store invoice URL in inquiry
-    await fetch('/api/store-invoice-url', {
+    await fetch('/api/inquiries', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ id: inquiry.id, invoiceUrl: invoiceData.url })
+      body: JSON.stringify({ action: 'store-invoice-url', id: inquiry.id, invoiceUrl: invoiceData.url })
     })
 
     // Update inquiry status
-    await fetch('/api/update-inquiry-status', {
+    await fetch('/api/inquiries', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ id: inquiry.id, status: 'invoiced' })
+      body: JSON.stringify({ action: 'update-status', id: inquiry.id, status: 'invoiced' })
     })
 
     // Show result
@@ -458,10 +458,10 @@ async function approveInvoice(invoiceId, inquiryId){
   }
 
   try {
-    const r = await fetch('/api/approve-invoice', {
+    const r = await fetch('/api/invoices', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ id: invoiceId })
+      body: JSON.stringify({ action: 'approve', id: invoiceId })
     })
 
     if(!r.ok) {
@@ -494,10 +494,10 @@ async function sendInvoiceEmail(invoiceId, inquiryId){
   }
 
   try {
-    const r = await fetch('/api/send-invoice-email', {
+    const r = await fetch('/api/invoices', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ invoiceId })
+      body: JSON.stringify({ action: 'send-email', invoiceId })
     })
 
     if(!r.ok) {
@@ -545,10 +545,10 @@ function getStatusColor(status) {
 
 async function updateInquiryStatus(id, status) {
   try {
-    const r = await fetch('/api/update-inquiry-status', {
+    const r = await fetch('/api/inquiries', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ id, status })
+      body: JSON.stringify({ action: 'update-status', id, status })
     })
 
     if(!r.ok) {
