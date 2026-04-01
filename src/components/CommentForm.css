@@ -1,0 +1,103 @@
+.comment-form-container {
+  margin-top: 40px;
+  padding: 24px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.comment-form-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  color: #333;
+}
+
+.comment-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comment-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.comment-form-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 500;
+  color: #333;
+}
+
+.comment-form-input,
+.comment-form-textarea {
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-family: inherit;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.comment-form-input:focus,
+.comment-form-textarea:focus {
+  outline: none;
+  border-color: #0aa7a7;
+  box-shadow: 0 0 0 3px rgba(10, 167, 167, 0.1);
+}
+
+.comment-form-textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.comment-form-error {
+  padding: 12px;
+  background: #fee;
+  color: #c33;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.comment-form-message {
+  padding: 12px;
+  background: #efe;
+  color: #3c3;
+  border-radius: 6px;
+  font-size: 0.9rem;
+}
+
+.comment-form-submit {
+  padding: 12px 24px;
+  background: #0aa7a7;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  align-self: flex-start;
+}
+
+.comment-form-submit:hover:not(:disabled) {
+  background: #078989;
+}
+
+.comment-form-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .comment-form-row {
+    grid-template-columns: 1fr;
+  }
+
+  .comment-form-container {
+    padding: 20px;
+  }
+}

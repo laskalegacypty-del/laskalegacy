@@ -1,0 +1,62 @@
+[
+    {
+      "name": "Leather Belt + Buckle",
+      "price": 300.0,
+      "pudoSize": "XS",
+      "notes": "Small accessory"
+    },
+    {
+      "name": "Saddle Bag",
+      "price": 450.0,
+      "pudoSize": "M",
+      "notes": "Soft goods"
+    },
+    {
+      "name": "Breastplate",
+      "price": 600.0,
+      "pudoSize": "S",
+      "notes": ""
+    },
+    {
+      "name": "Reins",
+      "price": 450.0,
+      "pudoSize": "XS",
+      "notes": ""
+    },
+    {
+      "name": "Slobber Straps",
+      "price": 50.0,
+      "pudoSize": "XS",
+      "notes": ""
+    },
+    {
+      "name": "Bridle",
+      "price": 650.0,
+      "pudoSize": "S",
+      "notes": ""
+    },
+    {
+      "name": "Cooling Towel",
+      "price": 50.0,
+      "pudoSize": "XS",
+      "notes": ""
+    },
+    {
+      "name": "Tack Bag (large)",
+      "price": 200.0,
+      "pudoSize": "M",
+      "notes": ""
+    },
+    {
+      "name": "Bridle Bag",
+      "price": 250.0,
+      "pudoSize": "S",
+      "notes": ""
+    },
+    {
+      "name": "Saddle stand",
+      "price": 500.0,
+      "pudoSize": "XL",
+      "notes": ""
+    }
+  ]

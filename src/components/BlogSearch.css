@@ -1,0 +1,129 @@
+.blog-search-container {
+  width: 100%;
+}
+
+.blog-search-form {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.blog-search-input {
+  flex: 1;
+  padding: 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.blog-search-input:focus {
+  outline: none;
+  border-color: #0aa7a7;
+  box-shadow: 0 0 0 3px rgba(10, 167, 167, 0.1);
+}
+
+.blog-search-button {
+  padding: 12px 24px;
+  background: #0aa7a7;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+  white-space: nowrap;
+}
+
+.blog-search-button:hover {
+  background: #078989;
+}
+
+.blog-search-loading {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.blog-search-results {
+  margin-top: 20px;
+}
+
+.blog-search-results-header {
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 16px;
+  font-size: 1.1rem;
+}
+
+.blog-search-error {
+  padding: 12px;
+  background: #fee;
+  color: #c33;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.blog-search-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.blog-search-result-item {
+  padding: 16px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+  border: 1px solid #eee;
+}
+
+.blog-search-result-item:hover {
+  background: #f0f0f0;
+  transform: translateX(4px);
+}
+
+.blog-search-result-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.blog-search-result-excerpt {
+  color: #666;
+  margin: 0 0 12px 0;
+  line-height: 1.6;
+}
+
+.blog-search-result-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.9rem;
+  color: #999;
+}
+
+.search-highlight {
+  background: #fff3cd;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-weight: 600;
+}
+
+.blog-search-no-results {
+  text-align: center;
+  padding: 32px;
+  color: #666;
+}
+
+@media (max-width: 768px) {
+  .blog-search-form {
+    flex-direction: column;
+  }
+
+  .blog-search-button {
+    width: 100%;
+  }
+}
