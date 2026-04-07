@@ -16,6 +16,60 @@ const BRAND = {
 function parsePrice(s) { return parseFloat((s || "0").replace(/[^0-9.]/g, "")) || 0; }
 function formatPrice(n) { return "R" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 
+// Resize/compress large images before upload to improve upload speed.
+async function optimizeImageForUpload(file) {
+  const MAX_DIMENSION = 2000;
+  const QUALITY = 0.82;
+  const SKIP_IF_SMALLER_THAN = 900 * 1024;
+
+  if (!file || file.size <= SKIP_IF_SMALLER_THAN || !isImageFile(file)) return file;
+
+  try {
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const img = await new Promise((resolve, reject) => {
+      const image = new Image();
+      image.onload = () => resolve(image);
+      image.onerror = reject;
+      image.src = dataUrl;
+    });
+
+    const scale = Math.min(1, MAX_DIMENSION / Math.max(img.width, img.height));
+    const width = Math.max(1, Math.round(img.width * scale));
+    const height = Math.max(1, Math.round(img.height * scale));
+
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return file;
+    ctx.drawImage(img, 0, 0, width, height);
+
+    const hasAlpha = (file.type || "").includes("png");
+    const outType = hasAlpha ? "image/png" : "image/jpeg";
+    const outExt = hasAlpha ? "png" : "jpg";
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, outType, QUALITY));
+    if (!blob) return file;
+    if (blob.size >= file.size) return file;
+
+    const baseName = (file.name || "image").replace(/\.[^.]+$/, "");
+    return new File([blob], `${baseName}.${outExt}`, { type: outType, lastModified: Date.now() });
+  } catch (err) {
+    console.warn("Image optimization skipped:", err);
+    return file;
+  }
+}
+
+async function uploadImageBatch(bucket, files) {
+  const optimized = await Promise.all(files.map((file) => optimizeImageForUpload(file)));
+  return Promise.all(optimized.map((file) => uploadImage(bucket, file)));
+}
+
 // All data loading/saving now goes through lib/supabase.js
 // The db.* functions handle all CRUD operations against Supabase
 
@@ -832,11 +886,7 @@ function AdminEditPage({ product, onSave, onCancel, showToast }) {
     }
     setUploading(true);
     try {
-      const newImages = [];
-      for (const file of imageFiles) {
-        const url = await uploadImage("products", file);
-        newImages.push(url);
-      }
+      const newImages = await uploadImageBatch("products", imageFiles);
       setForm(f => ({ ...f, images: [...(f.images || []), ...newImages] }));
       showToast?.(newImages.length === 1 ? "Image uploaded" : `${newImages.length} images uploaded`);
     } catch (err) {
@@ -922,11 +972,8 @@ function AdminGalleryPage({ gallery, setGallery, onBack, showToast }) {
     }
     setUploading(true);
     try {
-      const newItems = [];
-      for (const file of imageFiles) {
-        const url = await uploadImage("gallery", file);
-        newItems.push({ src: url, caption: "", sort_order: gallery.length + newItems.length });
-      }
+      const urls = await uploadImageBatch("gallery", imageFiles);
+      const newItems = urls.map((url, i) => ({ src: url, caption: "", sort_order: gallery.length + i }));
       const saved = await db.addGalleryItems(newItems);
       setGallery([...gallery, ...saved]);
       showToast(`${saved.length} image${saved.length > 1 ? "s" : ""} added`);
@@ -1405,7 +1452,8 @@ function BlogEditPage({ post, onSave, onCancel, showToast }) {
     }
     setUploading(true);
     try {
-      const url = await uploadImage("blog", file);
+      const optimizedFile = await optimizeImageForUpload(file);
+      const url = await uploadImage("blog", optimizedFile);
       set("coverImage", url);
       showToast?.("Cover image uploaded");
     } catch (err) {
@@ -1428,10 +1476,7 @@ function BlogEditPage({ post, onSave, onCancel, showToast }) {
     }
     setUploading(true);
     try {
-      const newImgs = [];
-      for (const file of imageFiles) {
-        newImgs.push(await uploadImage("blog", file));
-      }
+      const newImgs = await uploadImageBatch("blog", imageFiles);
       setForm(f => ({ ...f, images: [...(f.images || []), ...newImgs] }));
       showToast?.(newImgs.length === 1 ? "Image uploaded" : `${newImgs.length} images uploaded`);
     } catch (err) {
