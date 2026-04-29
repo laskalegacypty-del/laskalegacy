@@ -80,6 +80,23 @@ const CATEGORIES = {
   bags: { label: "Bags & Canvas", logo: "/category-logo-orange.png" },
 };
 
+function toCategoryKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+function titleCaseCategory(value) {
+  return String(value || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase());
+}
+
 const Icons = {
   menu: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
   x: <svg width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
@@ -127,7 +144,7 @@ function ProductImage({ name, category, images, size = 280 }) {
     <div style={{ width: "100%", aspectRatio: "1", background: `linear-gradient(145deg, ${p.bg}, ${p.accent})`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", borderRadius: 8, position: "relative", overflow: "hidden" }}>
       <div style={{ position: "absolute", inset: 0, opacity: 0.05, background: "repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.08) 10px, rgba(255,255,255,0.08) 20px)" }} />
       <div style={{ fontSize: size * 0.16, color: p.fg, fontFamily: "'Montserrat', sans-serif", fontWeight: 800, letterSpacing: 3, opacity: 0.9 }}>{initials}</div>
-      <div style={{ fontSize: size * 0.04, color: p.fg, fontFamily: "'Inter', sans-serif", marginTop: 8, textTransform: "uppercase", letterSpacing: 4, opacity: 0.5 }}>{CATEGORIES[category]?.label || category}</div>
+      <div style={{ fontSize: size * 0.04, color: p.fg, fontFamily: "'Inter', sans-serif", marginTop: 8, textTransform: "uppercase", letterSpacing: 4, opacity: 0.5 }}>{CATEGORIES[category]?.label || titleCaseCategory(category)}</div>
     </div>
   );
 }
@@ -173,11 +190,35 @@ export default function LaskaLegacy() {
   const [toast, setToast] = useState(null);
   const [adminPass, setAdminPass] = useState("");
   const [adminAuth, setAdminAuth] = useState(false);
+  const [customCategories, setCustomCategories] = useState({});
+  const [customSubcategories, setCustomSubcategories] = useState({});
 
   useEffect(() => {
     (async () => {
       const prods = await db.loadProducts();
       setProducts(prods);
+      const inferredCategories = {};
+      const inferredSubcategories = {};
+      (prods || []).forEach((p) => {
+        const rawKey = p?.category;
+        if (!rawKey) return;
+        const key = toCategoryKey(rawKey) || String(rawKey);
+        if (!CATEGORIES[key] && !inferredCategories[key]) {
+          inferredCategories[key] = {
+            label: titleCaseCategory(rawKey),
+            logo: CATEGORIES.bags.logo,
+          };
+        }
+        const rawSub = p?.subcategory;
+        if (!rawSub) return;
+        const subKey = toCategoryKey(rawSub) || String(rawSub);
+        if (!inferredSubcategories[key]) inferredSubcategories[key] = {};
+        if (!inferredSubcategories[key][subKey]) {
+          inferredSubcategories[key][subKey] = titleCaseCategory(rawSub);
+        }
+      });
+      setCustomCategories(inferredCategories);
+      setCustomSubcategories(inferredSubcategories);
       const msgs = await db.loadMessages();
       setMessages(msgs);
       const gal = await db.loadGallery();
@@ -191,6 +232,51 @@ export default function LaskaLegacy() {
   }, []);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+  const allCategories = { ...CATEGORIES, ...customCategories };
+  const ensureCustomCategory = useCallback((rawCategory) => {
+    const key = toCategoryKey(rawCategory);
+    if (!key || CATEGORIES[key]) return key;
+    setCustomCategories((prev) => {
+      if (prev[key]) return prev;
+      return {
+        ...prev,
+        [key]: {
+          label: titleCaseCategory(rawCategory),
+          logo: CATEGORIES.bags.logo,
+        },
+      };
+    });
+    return key;
+  }, []);
+  const handleCreateCategory = useCallback((name) => {
+    const key = ensureCustomCategory(name);
+    if (!key) return null;
+    showToast(`Category "${titleCaseCategory(name)}" added`);
+    return key;
+  }, [ensureCustomCategory]);
+  const ensureCustomSubcategory = useCallback((categoryKey, rawSubcategory) => {
+    const normalizedCategory = toCategoryKey(categoryKey);
+    const subKey = toCategoryKey(rawSubcategory);
+    if (!normalizedCategory || !subKey) return subKey;
+    setCustomSubcategories((prev) => {
+      const current = prev[normalizedCategory] || {};
+      if (current[subKey]) return prev;
+      return {
+        ...prev,
+        [normalizedCategory]: {
+          ...current,
+          [subKey]: titleCaseCategory(rawSubcategory),
+        },
+      };
+    });
+    return subKey;
+  }, []);
+  const handleCreateSubcategory = useCallback((categoryKey, name) => {
+    const subKey = ensureCustomSubcategory(categoryKey, name);
+    if (!subKey) return null;
+    showToast(`Subcategory "${titleCaseCategory(name)}" added`);
+    return subKey;
+  }, [ensureCustomSubcategory]);
   const navigate = (p, data) => {
     setPage(p); setMobileMenu(false);
     if (data !== undefined) {
@@ -209,7 +295,11 @@ export default function LaskaLegacy() {
     showToast("Product deleted");
   };
   const handleSaveProduct = async (prod) => {
-    const saved = await db.saveProduct(prod);
+    const normalizedCategory = toCategoryKey(prod.category) || prod.category;
+    const normalizedSubcategory = toCategoryKey(prod.subcategory) || "";
+    const saved = await db.saveProduct({ ...prod, category: normalizedCategory, subcategory: normalizedSubcategory });
+    ensureCustomCategory(saved.category);
+    ensureCustomSubcategory(saved.category, saved.subcategory);
     if (prod.id) {
       setProducts(products.map(p => p.id === saved.id ? saved : p));
     } else {
@@ -358,7 +448,7 @@ export default function LaskaLegacy() {
               <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 32, color: BRAND.black, fontWeight: 800 }}>Our Collections</h2>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 20 }}>
-              {Object.entries(CATEGORIES).map(([key, { label, logo }]) => (
+              {Object.entries(allCategories).map(([key, { label, logo }]) => (
                 <button key={key} onClick={() => { setFilter(key); navigate("shop"); }} style={{ background: BRAND.white, border: "1px solid rgba(0,0,0,0.06)", borderRadius: 10, padding: "32px 24px", textAlign: "center", cursor: "pointer", transition: "all 0.3s" }}
                   onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = "0 8px 30px rgba(0,0,0,0.08)"; e.currentTarget.style.borderColor = BRAND.teal; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.borderColor = "rgba(0,0,0,0.06)"; }}>
@@ -381,7 +471,7 @@ export default function LaskaLegacy() {
                   <div key={p.id} className="product-card fade-up" style={{ animationDelay: `${i * 0.1}s` }} onClick={() => navigate("product", p)}>
                     <ProductImage name={p.name} category={p.category} images={p.images} />
                     <div style={{ padding: "20px 20px 24px" }}>
-                      <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 6, fontWeight: 700 }}>{CATEGORIES[p.category]?.label}</div>
+                      <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 6, fontWeight: 700 }}>{allCategories[p.category]?.label || titleCaseCategory(p.category)}</div>
                       <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 17, color: BRAND.black, fontWeight: 700, marginBottom: 8 }}>{p.name}</h3>
                       <div style={{ fontSize: 16, fontWeight: 800, color: BRAND.purple }}>{p.price}</div>
                     </div>
@@ -415,7 +505,7 @@ export default function LaskaLegacy() {
             <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 36, color: BRAND.black, fontWeight: 800, marginBottom: 16 }}>Shop</h1>
             <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
               <button className={`filter-btn ${filter === "all" ? "active" : ""}`} onClick={() => setFilter("all")}>All</button>
-              {Object.entries(CATEGORIES).map(([key, { label }]) => (
+              {Object.entries(allCategories).map(([key, { label }]) => (
                 <button key={key} className={`filter-btn ${filter === key ? "active" : ""}`} onClick={() => setFilter(key)}>{label}</button>
               ))}
             </div>
@@ -425,7 +515,7 @@ export default function LaskaLegacy() {
               <div key={p.id} className="product-card fade-up" style={{ animationDelay: `${i * 0.05}s` }} onClick={() => navigate("product", p)}>
                 <ProductImage name={p.name} category={p.category} images={p.images} />
                 <div style={{ padding: "20px 20px 24px" }}>
-                  <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 6, fontWeight: 700 }}>{CATEGORIES[p.category]?.label}</div>
+                  <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 6, fontWeight: 700 }}>{allCategories[p.category]?.label || titleCaseCategory(p.category)}</div>
                   <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 17, color: BRAND.black, fontWeight: 700, marginBottom: 4 }}>{p.name}</h3>
                   <p style={{ fontSize: 13, color: BRAND.grey, lineHeight: 1.5, marginBottom: 10 }}>{p.description.slice(0, 80)}{"\u2026"}</p>
                   <div style={{ fontSize: 16, fontWeight: 800, color: BRAND.purple }}>{p.price}</div>
@@ -448,7 +538,7 @@ export default function LaskaLegacy() {
               <ProductGallery images={selectedProduct.images} name={selectedProduct.name} category={selectedProduct.category} />
             </div>
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: BRAND.teal, marginBottom: 8, fontWeight: 700 }}>{CATEGORIES[selectedProduct.category]?.label}</div>
+              <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: BRAND.teal, marginBottom: 8, fontWeight: 700 }}>{allCategories[selectedProduct.category]?.label || titleCaseCategory(selectedProduct.category)}</div>
               <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 30, color: BRAND.black, fontWeight: 800, marginBottom: 12 }}>{selectedProduct.name}</h1>
               <div style={{ fontSize: 24, fontWeight: 800, color: BRAND.purple, marginBottom: 24 }}>{selectedProduct.price}</div>
               <p style={{ fontSize: 15, lineHeight: 1.8, color: BRAND.grey, marginBottom: 32 }}>{selectedProduct.description}</p>
@@ -637,7 +727,7 @@ export default function LaskaLegacy() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 Blog ({blogPosts.length})
               </button>
-              <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-edit", { id: "", name: "", category: "bridles", price: "", description: "", images: [], featured: false })}>{Icons.plus} Add Product</button>
+              <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-edit", { id: "", name: "", category: "bridles", subcategory: "", price: "", description: "", images: [], featured: false })}>{Icons.plus} Add Product</button>
             </div>
           </div>
           {products.map(p => (
@@ -647,7 +737,11 @@ export default function LaskaLegacy() {
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{p.name}</div>
-                <div style={{ fontSize: 12, color: BRAND.grey }}>{CATEGORIES[p.category]?.label} {"\u00B7"} {p.price}{p.featured ? " \u00B7 \u2B50 Featured" : ""}{p.images?.length ? ` \u00B7 ${p.images.length} photo${p.images.length > 1 ? "s" : ""}` : ""}</div>
+                <div style={{ fontSize: 12, color: BRAND.grey }}>
+                  {allCategories[p.category]?.label || titleCaseCategory(p.category)}
+                  {p.subcategory ? ` > ${titleCaseCategory(p.subcategory)}` : ""}
+                  {" \u00B7 "} {p.price}{p.featured ? " \u00B7 \u2B50 Featured" : ""}{p.images?.length ? ` \u00B7 ${p.images.length} photo${p.images.length > 1 ? "s" : ""}` : ""}
+                </div>
               </div>
               <button className="icon-btn" onClick={() => navigate("admin-edit", { ...p })}>{Icons.edit}</button>
               <button className="icon-btn" style={{ color: "#dc2626" }} onClick={() => { if (confirm("Delete " + p.name + "?")) handleDeleteProduct(p.id); }}>{Icons.trash}</button>
@@ -658,7 +752,7 @@ export default function LaskaLegacy() {
 
       {/* ADMIN EDIT */}
       {page === "admin-edit" && adminAuth && editProduct && (
-        <AdminEditPage product={editProduct} onSave={handleSaveProduct} onCancel={() => navigate("admin")} showToast={showToast} />
+        <AdminEditPage product={editProduct} onSave={handleSaveProduct} onCancel={() => navigate("admin")} showToast={showToast} categories={allCategories} onCreateCategory={handleCreateCategory} subcategoriesByCategory={customSubcategories} onCreateSubcategory={handleCreateSubcategory} />
       )}
 
       {/* ADMIN MESSAGES */}
@@ -871,10 +965,13 @@ function ContactPage({ onSubmit }) {
   );
 }
 
-function AdminEditPage({ product, onSave, onCancel, showToast }) {
-  const [form, setForm] = useState({ ...product, images: product.images || [] });
+function AdminEditPage({ product, onSave, onCancel, showToast, categories, onCreateCategory, subcategoriesByCategory, onCreateSubcategory }) {
+  const [form, setForm] = useState({ ...product, subcategory: product.subcategory || "", images: product.images || [] });
   const [uploading, setUploading] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
+  const [newSubcategory, setNewSubcategory] = useState("");
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const activeSubcategories = subcategoriesByCategory?.[form.category] || {};
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
@@ -910,8 +1007,64 @@ function AdminEditPage({ product, onSave, onCancel, showToast }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         <div><label className="ll-label">Product Name</label><input className="ll-input" value={form.name} onChange={e => set("name", e.target.value)} /></div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <div><label className="ll-label">Category</label><select className="ll-input" value={form.category} onChange={e => set("category", e.target.value)}>{Object.entries(CATEGORIES).map(([k, { label }]) => <option key={k} value={k}>{label}</option>)}</select></div>
+          <div>
+            <label className="ll-label">Category</label>
+            <select className="ll-input" value={form.category} onChange={e => { set("category", e.target.value); set("subcategory", ""); }}>
+              {Object.entries(categories || CATEGORIES).map(([k, { label }]) => <option key={k} value={k}>{label}</option>)}
+            </select>
+            <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+              <input
+                className="ll-input"
+                value={newCategory}
+                onChange={e => setNewCategory(e.target.value)}
+                placeholder="New category name"
+                style={{ margin: 0 }}
+              />
+              <button
+                type="button"
+                className="ll-btn ll-btn-outline ll-btn-sm"
+                onClick={() => {
+                  const key = onCreateCategory?.(newCategory);
+                  if (!key) return;
+                  set("category", key);
+                  setNewCategory("");
+                }}
+              >
+                Add Category
+              </button>
+            </div>
+          </div>
           <div><label className="ll-label">Price</label><input className="ll-input" value={form.price} onChange={e => set("price", e.target.value)} placeholder="R450" /></div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "end" }}>
+          <div>
+            <label className="ll-label">Subcategory (optional)</label>
+            <select className="ll-input" value={form.subcategory || ""} onChange={e => set("subcategory", e.target.value)}>
+              <option value="">No subcategory</option>
+              {Object.entries(activeSubcategories).map(([k, label]) => <option key={k} value={k}>{label}</option>)}
+            </select>
+          </div>
+          <button
+            type="button"
+            className="ll-btn ll-btn-outline ll-btn-sm"
+            onClick={() => {
+              const subKey = onCreateSubcategory?.(form.category, newSubcategory);
+              if (!subKey) return;
+              set("subcategory", subKey);
+              setNewSubcategory("");
+            }}
+          >
+            Add Subcategory
+          </button>
+        </div>
+        <div>
+          <input
+            className="ll-input"
+            value={newSubcategory}
+            onChange={e => setNewSubcategory(e.target.value)}
+            placeholder="New subcategory name (inside selected category)"
+            style={{ margin: 0 }}
+          />
         </div>
         <div><label className="ll-label">Description</label><textarea className="ll-input" value={form.description} onChange={e => set("description", e.target.value)} /></div>
 
@@ -1158,7 +1311,7 @@ function OrderFormPage({ products, onSubmit }) {
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: 600, fontSize: 14, color: BRAND.black }}>{p.name}</div>
-                  <div style={{ fontSize: 12, color: BRAND.grey }}>{CATEGORIES[p.category]?.label}</div>
+                  <div style={{ fontSize: 12, color: BRAND.grey }}>{CATEGORIES[p.category]?.label || titleCaseCategory(p.category)}</div>
                 </div>
                 <div style={{ fontWeight: 800, color: BRAND.purple, fontSize: 14, flexShrink: 0 }}>{p.price}</div>
                 {sel && (
