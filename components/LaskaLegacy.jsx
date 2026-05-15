@@ -20,8 +20,10 @@ const ANATOMIC_SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 
 function isAnatomicShirt(product) {
   const name = String(product?.name || "").toLowerCase();
+  const sub = String(product?.subcategory || "").toLowerCase().replace(/_/g, "-");
+  if (sub.includes("western-shirt") || sub.includes("button-shirt")) return true;
   if (!name.includes("shirt")) return false;
-  return name.includes("anatomic") || name.includes("button shirt");
+  return name.includes("anatomic") || name.includes("button shirt") || name.includes("button");
 }
 
 function getProductSizes(product) {
@@ -231,9 +233,34 @@ export default function LaskaLegacy() {
   const [customSubcategories, setCustomSubcategories] = useState({});
 
   useEffect(() => {
+    let cancelled = false;
+    const finishLoading = () => {
+      if (!cancelled) setLoading(false);
+    };
+    const maxWait = setTimeout(finishLoading, 15000);
+
+    const withTimeout = (promise, ms = 10000) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Request timed out")), ms)
+        ),
+      ]);
+
+    const safeLoad = (loader, fallback = []) =>
+      withTimeout(loader()).catch((err) => {
+        console.error(err);
+        return fallback;
+      });
+
     (async () => {
       try {
-        const prods = await db.loadProducts();
+        if (!db.isSupabaseConfigured()) {
+          console.warn("Supabase not configured — add env vars on Vercel");
+          return;
+        }
+        const prods = await safeLoad(db.loadProducts, []);
+        if (cancelled) return;
         setProducts(prods);
         const inferredCategories = {};
         const inferredSubcategories = {};
@@ -257,20 +284,29 @@ export default function LaskaLegacy() {
         });
         setCustomCategories(inferredCategories);
         setCustomSubcategories(inferredSubcategories);
-        const msgs = await db.loadMessages();
+        const [msgs, gal, ords, posts] = await Promise.all([
+          safeLoad(db.loadMessages, []),
+          safeLoad(db.loadGallery, []),
+          safeLoad(db.loadOrders, []),
+          safeLoad(db.loadBlogPosts, []),
+        ]);
+        if (cancelled) return;
         setMessages(msgs);
-        const gal = await db.loadGallery();
         setGallery(gal);
-        const ords = await db.loadOrders();
         setOrders(ords);
-        const posts = await db.loadBlogPosts();
         setBlogPosts(posts);
       } catch (err) {
         console.error("Failed to load site data:", err);
       } finally {
-        setLoading(false);
+        clearTimeout(maxWait);
+        finishLoading();
       }
     })();
+
+    return () => {
+      cancelled = true;
+      clearTimeout(maxWait);
+    };
   }, []);
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
