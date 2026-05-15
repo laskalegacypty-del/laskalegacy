@@ -16,6 +16,43 @@ const BRAND = {
 function parsePrice(s) { return parseFloat((s || "0").replace(/[^0-9.]/g, "")) || 0; }
 function formatPrice(n) { return "R" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
 
+const ANATOMIC_SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
+
+function isAnatomicShirt(product) {
+  const name = String(product?.name || "").toLowerCase();
+  if (!name.includes("shirt")) return false;
+  return name.includes("anatomic") || name.includes("button shirt");
+}
+
+function getProductSizes(product) {
+  if (!isAnatomicShirt(product)) return [];
+  const custom = product?.sizes;
+  if (Array.isArray(custom) && custom.length > 0) return custom.filter(Boolean);
+  return ANATOMIC_SHIRT_SIZES;
+}
+
+function getProductStyles(product) {
+  if (!isAnatomicShirt(product)) return [];
+  const images = product?.images || [];
+  const labels = product?.image_labels || product?.imageLabels || [];
+  return images.map((src, i) => ({
+    index: i,
+    label: (labels[i] || "").trim() || `Style ${i + 1}`,
+    image: src,
+  }));
+}
+
+function productNeedsOrderOptions(product) {
+  return isAnatomicShirt(product);
+}
+
+function formatOrderItemLabel(item) {
+  const extras = [];
+  if (item.size) extras.push(`Size ${item.size}`);
+  if (item.styleLabel) extras.push(item.styleLabel);
+  return extras.length ? `${item.name} (${extras.join(" · ")})` : item.name;
+}
+
 // Resize/compress large images before upload to improve upload speed.
 async function optimizeImageForUpload(file) {
   const MAX_DIMENSION = 2000;
@@ -195,39 +232,44 @@ export default function LaskaLegacy() {
 
   useEffect(() => {
     (async () => {
-      const prods = await db.loadProducts();
-      setProducts(prods);
-      const inferredCategories = {};
-      const inferredSubcategories = {};
-      (prods || []).forEach((p) => {
-        const rawKey = p?.category;
-        if (!rawKey) return;
-        const key = toCategoryKey(rawKey) || String(rawKey);
-        if (!CATEGORIES[key] && !inferredCategories[key]) {
-          inferredCategories[key] = {
-            label: titleCaseCategory(rawKey),
-            logo: CATEGORIES.bags.logo,
-          };
-        }
-        const rawSub = p?.subcategory;
-        if (!rawSub) return;
-        const subKey = toCategoryKey(rawSub) || String(rawSub);
-        if (!inferredSubcategories[key]) inferredSubcategories[key] = {};
-        if (!inferredSubcategories[key][subKey]) {
-          inferredSubcategories[key][subKey] = titleCaseCategory(rawSub);
-        }
-      });
-      setCustomCategories(inferredCategories);
-      setCustomSubcategories(inferredSubcategories);
-      const msgs = await db.loadMessages();
-      setMessages(msgs);
-      const gal = await db.loadGallery();
-      setGallery(gal);
-      const ords = await db.loadOrders();
-      setOrders(ords);
-      const posts = await db.loadBlogPosts();
-      setBlogPosts(posts);
-      setLoading(false);
+      try {
+        const prods = await db.loadProducts();
+        setProducts(prods);
+        const inferredCategories = {};
+        const inferredSubcategories = {};
+        (prods || []).forEach((p) => {
+          const rawKey = p?.category;
+          if (!rawKey) return;
+          const key = toCategoryKey(rawKey) || String(rawKey);
+          if (!CATEGORIES[key] && !inferredCategories[key]) {
+            inferredCategories[key] = {
+              label: titleCaseCategory(rawKey),
+              logo: CATEGORIES.bags.logo,
+            };
+          }
+          const rawSub = p?.subcategory;
+          if (!rawSub) return;
+          const subKey = toCategoryKey(rawSub) || String(rawSub);
+          if (!inferredSubcategories[key]) inferredSubcategories[key] = {};
+          if (!inferredSubcategories[key][subKey]) {
+            inferredSubcategories[key][subKey] = titleCaseCategory(rawSub);
+          }
+        });
+        setCustomCategories(inferredCategories);
+        setCustomSubcategories(inferredSubcategories);
+        const msgs = await db.loadMessages();
+        setMessages(msgs);
+        const gal = await db.loadGallery();
+        setGallery(gal);
+        const ords = await db.loadOrders();
+        setOrders(ords);
+        const posts = await db.loadBlogPosts();
+        setBlogPosts(posts);
+      } catch (err) {
+        console.error("Failed to load site data:", err);
+      } finally {
+        setLoading(false);
+      }
     })();
   }, []);
 
@@ -360,9 +402,12 @@ export default function LaskaLegacy() {
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
         @keyframes toastIn { from { opacity:0; transform: translateY(20px); } to { opacity:1; transform:translateY(0); } }
         @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 0.6; } }
-        .fade-up { animation: fadeUp 0.6s ease both; }
-        .fade-in { animation: fadeIn 0.5s ease both; }
-        .slide-in { animation: slideIn 0.3s ease both; }
+        .fade-up { animation: fadeUp 0.6s ease forwards; }
+        .fade-in { animation: fadeIn 0.5s ease forwards; }
+        .slide-in { animation: slideIn 0.3s ease forwards; }
+        @media (prefers-reduced-motion: reduce) {
+          .fade-up, .fade-in, .slide-in { animation: none !important; opacity: 1 !important; transform: none !important; }
+        }
         .ll-btn { display:inline-flex; align-items:center; gap:8px; padding:12px 28px; border:none; cursor:pointer; font-family:'Inter',sans-serif; font-size:13px; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; transition:all 0.25s ease; border-radius:6px; }
         .ll-btn-primary { background:${BRAND.teal}; color:${BRAND.white}; }
         .ll-btn-primary:hover { background:${BRAND.tealDark}; transform:translateY(-1px); box-shadow:0 6px 24px rgba(0,151,178,0.3); }
@@ -966,7 +1011,13 @@ function ContactPage({ onSubmit }) {
 }
 
 function AdminEditPage({ product, onSave, onCancel, showToast, categories, onCreateCategory, subcategoriesByCategory, onCreateSubcategory }) {
-  const [form, setForm] = useState({ ...product, subcategory: product.subcategory || "", images: product.images || [] });
+  const [form, setForm] = useState({
+    ...product,
+    subcategory: product.subcategory || "",
+    images: product.images || [],
+    image_labels: product.image_labels || product.imageLabels || [],
+    sizes: product.sizes || [],
+  });
   const [uploading, setUploading] = useState(false);
   const [newCategory, setNewCategory] = useState("");
   const [newSubcategory, setNewSubcategory] = useState("");
@@ -984,7 +1035,11 @@ function AdminEditPage({ product, onSave, onCancel, showToast, categories, onCre
     setUploading(true);
     try {
       const newImages = await uploadImageBatch("products", imageFiles);
-      setForm(f => ({ ...f, images: [...(f.images || []), ...newImages] }));
+      setForm(f => ({
+        ...f,
+        images: [...(f.images || []), ...newImages],
+        image_labels: [...(f.image_labels || []), ...newImages.map(() => "")],
+      }));
       showToast?.(newImages.length === 1 ? "Image uploaded" : `${newImages.length} images uploaded`);
     } catch (err) {
       console.error("Upload error:", err);
@@ -994,11 +1049,29 @@ function AdminEditPage({ product, onSave, onCancel, showToast, categories, onCre
     setUploading(false);
     e.target.value = "";
   };
-  const removeImage = (index) => setForm(f => ({ ...f, images: f.images.filter((_, i) => i !== index) }));
+  const removeImage = (index) => setForm(f => ({
+    ...f,
+    images: f.images.filter((_, i) => i !== index),
+    image_labels: (f.image_labels || []).filter((_, i) => i !== index),
+  }));
   const moveImage = (from, to) => {
     if (to < 0 || to >= form.images.length) return;
-    setForm(f => { const imgs = [...f.images]; const [moved] = imgs.splice(from, 1); imgs.splice(to, 0, moved); return { ...f, images: imgs }; });
+    setForm(f => {
+      const imgs = [...f.images];
+      const labels = [...(f.image_labels || [])];
+      const [movedImg] = imgs.splice(from, 1);
+      const [movedLabel] = labels.splice(from, 1);
+      imgs.splice(to, 0, movedImg);
+      labels.splice(to, 0, movedLabel ?? "");
+      return { ...f, images: imgs, image_labels: labels };
+    });
   };
+  const setImageLabel = (index, value) => setForm(f => {
+    const labels = [...(f.image_labels || [])];
+    while (labels.length < (f.images || []).length) labels.push("");
+    labels[index] = value;
+    return { ...f, image_labels: labels };
+  });
 
   return (
     <div className="fade-in" style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px 80px" }}>
@@ -1070,18 +1143,27 @@ function AdminEditPage({ product, onSave, onCancel, showToast, categories, onCre
 
         <div>
           <label className="ll-label">Product Images</label>
-          <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 12 }}>Upload multiple photos. First image is the main thumbnail.</p>
+          <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 12 }}>Upload multiple photos. First image is the main thumbnail. Label each image with the style name shown on the order page.</p>
           {form.images && form.images.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 16 }}>
               {form.images.map((src, i) => (
-                <div key={i} style={{ position: "relative", width: 100, height: 100, borderRadius: 8, overflow: "hidden", border: i === 0 ? `2.5px solid ${BRAND.teal}` : `2px solid ${BRAND.greyLight}`, background: BRAND.offWhite }}>
+                <div key={i} style={{ width: 120 }}>
+                  <div style={{ position: "relative", width: 100, height: 100, borderRadius: 8, overflow: "hidden", border: i === 0 ? `2.5px solid ${BRAND.teal}` : `2px solid ${BRAND.greyLight}`, background: BRAND.offWhite }}>
                   <img src={src} alt={`Product ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                   {i === 0 && <div style={{ position: "absolute", top: 4, left: 4, background: BRAND.teal, color: BRAND.white, fontSize: 9, fontWeight: 700, letterSpacing: 1, padding: "2px 6px", borderRadius: 3, textTransform: "uppercase" }}>Main</div>}
                   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 2, background: "linear-gradient(transparent, rgba(0,0,0,0.7))", padding: "16px 4px 4px" }}>
                     {i > 0 && <button onClick={e => { e.stopPropagation(); moveImage(i, i - 1); }} style={{ background: "rgba(255,255,255,0.9)", border: "none", borderRadius: 3, width: 22, height: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: BRAND.black }}>{"\u2190"}</button>}
                     {i < form.images.length - 1 && <button onClick={e => { e.stopPropagation(); moveImage(i, i + 1); }} style={{ background: "rgba(255,255,255,0.9)", border: "none", borderRadius: 3, width: 22, height: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: BRAND.black }}>{"\u2192"}</button>}
-                    <button onClick={e => { e.stopPropagation(); removeImage(i); }} style={{ background: "rgba(220,38,38,0.9)", border: "none", borderRadius: 3, width: 22, height: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff" }}>{"\u2715"}</button>
+                    <button type="button" onClick={e => { e.stopPropagation(); removeImage(i); }} style={{ background: "rgba(220,38,38,0.9)", border: "none", borderRadius: 3, width: 22, height: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: "#fff" }}>{"\u2715"}</button>
                   </div>
+                  </div>
+                  <input
+                    className="ll-input"
+                    value={(form.image_labels || [])[i] || ""}
+                    onChange={e => setImageLabel(i, e.target.value)}
+                    placeholder={`Style ${i + 1} label`}
+                    style={{ marginTop: 6, padding: "6px 8px", fontSize: 11 }}
+                  />
                 </div>
               ))}
             </div>
@@ -1095,6 +1177,19 @@ function AdminEditPage({ product, onSave, onCancel, showToast, categories, onCre
             <div style={{ fontSize: 11, color: BRAND.grey, marginTop: 2 }}>JPG, PNG, WebP {"\u2014"} select multiple files</div>
           </label>
         </div>
+
+        {isAnatomicShirt(form) && (
+          <div>
+            <label className="ll-label">Available sizes</label>
+            <input
+              className="ll-input"
+              value={(form.sizes || []).join(", ")}
+              onChange={e => set("sizes", e.target.value.split(",").map(s => s.trim()).filter(Boolean))}
+              placeholder="XS, S, M, L, XL, XXL"
+            />
+            <p style={{ fontSize: 11, color: BRAND.grey, marginTop: 4 }}>Comma-separated. Shown on the order page when this product is selected.</p>
+          </div>
+        )}
 
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <input type="checkbox" id="featured" checked={form.featured} onChange={e => set("featured", e.target.checked)} style={{ width: 18, height: 18, accentColor: BRAND.teal }} />
@@ -1252,9 +1347,10 @@ function OrderFormPage({ products, onSubmit }) {
   const toggleProduct = (p) => {
     const exists = items.find(it => it.productId === p.id);
     if (exists) setItems(items.filter(it => it.productId !== p.id));
-    else setItems([...items, { productId: p.id, name: p.name, price: p.price, qty: 1 }]);
+    else setItems([...items, { productId: p.id, name: p.name, price: p.price, qty: 1, size: "", styleIndex: null, styleLabel: "" }]);
   };
   const setQty = (pid, qty) => setItems(items.map(it => it.productId === pid ? { ...it, qty: Math.max(1, qty) } : it));
+  const setItemOption = (pid, patch) => setItems(items.map(it => it.productId === pid ? { ...it, ...patch } : it));
   const total = items.reduce((s, it) => s + parsePrice(it.price) * it.qty, 0);
   const courierFee = courier === "express" ? 250 : courier === "standard" ? 150 : 0;
 
@@ -1265,6 +1361,14 @@ function OrderFormPage({ products, onSubmit }) {
     if (!client.phone.trim()) e.phone = true;
     if (courier !== "collect" && !client.address.trim()) e.address = true;
     if (items.length === 0) e.items = true;
+    items.forEach(it => {
+      const p = products.find(x => x.id === it.productId);
+      if (!p || !productNeedsOrderOptions(p)) return;
+      const sizes = getProductSizes(p);
+      const styles = getProductStyles(p);
+      if (sizes.length && !it.size) e.itemOptions = true;
+      if (styles.length && (it.styleIndex == null || it.styleIndex < 0)) e.itemOptions = true;
+    });
     setErrors(e); return Object.keys(e).length === 0;
   };
 
@@ -1297,13 +1401,19 @@ function OrderFormPage({ products, onSubmit }) {
       <div style={{ marginBottom: 32 }}>
         <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 16, fontWeight: 700, color: BRAND.black, marginBottom: 4 }}>Select Products *</h3>
         {errors.items && <p style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>Please select at least one product</p>}
+        {errors.itemOptions && <p style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>Please choose a size and style for each shirt with options</p>}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
           {products.map(p => {
             const sel = items.find(it => it.productId === p.id);
+            const sizes = getProductSizes(p);
+            const styles = getProductStyles(p);
+            const showOptions = sel && productNeedsOrderOptions(p);
             return (
-              <div key={p.id} onClick={() => !sel && toggleProduct(p)} style={{
-                display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderRadius: 10,
+              <div key={p.id} style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+              <div onClick={() => !sel && toggleProduct(p)} style={{
+                display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderRadius: showOptions ? "10px 10px 0 0" : 10,
                 border: sel ? `2px solid ${BRAND.teal}` : `1px solid ${BRAND.greyLight}`, background: sel ? BRAND.tealLight : BRAND.white,
+                borderBottom: showOptions ? "none" : undefined,
                 cursor: "pointer", transition: "all 0.2s",
               }}>
                 <div style={{ width: 22, height: 22, borderRadius: 4, border: sel ? `2px solid ${BRAND.teal}` : `2px solid ${BRAND.greyLight}`, background: sel ? BRAND.teal : BRAND.white, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.2s" }}>
@@ -1322,6 +1432,55 @@ function OrderFormPage({ products, onSubmit }) {
                     <button onClick={() => toggleProduct(p)} style={{ marginLeft: 4, background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}>{"\u2715"}</button>
                   </div>
                 )}
+              </div>
+              {showOptions && (
+                <div onClick={e => e.stopPropagation()} style={{
+                  padding: "16px", borderRadius: "0 0 10px 10px",
+                  border: `2px solid ${BRAND.teal}`, borderTop: `1px solid ${BRAND.greyLight}`,
+                  background: BRAND.white,
+                }}>
+                  {sizes.length > 0 && (
+                    <div style={{ marginBottom: styles.length > 0 ? 16 : 0 }}>
+                      <div className="ll-label" style={{ marginBottom: 8 }}>Size *</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                        {sizes.map(size => (
+                          <button
+                            key={size}
+                            type="button"
+                            onClick={() => setItemOption(p.id, { size })}
+                            style={{
+                              padding: "8px 16px", borderRadius: 6, border: sel.size === size ? `2px solid ${BRAND.teal}` : `1px solid ${BRAND.greyLight}`,
+                              background: sel.size === size ? BRAND.tealLight : BRAND.white,
+                              fontWeight: 700, fontSize: 13, cursor: "pointer", color: BRAND.black,
+                            }}
+                          >{size}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {styles.length > 0 && (
+                    <div>
+                      <div className="ll-label" style={{ marginBottom: 8 }}>Style *</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                        {styles.map(style => (
+                          <button
+                            key={style.index}
+                            type="button"
+                            onClick={() => setItemOption(p.id, { styleIndex: style.index, styleLabel: style.label })}
+                            style={{
+                              width: 88, padding: 0, border: sel.styleIndex === style.index ? `2px solid ${BRAND.teal}` : `1px solid ${BRAND.greyLight}`,
+                              borderRadius: 8, background: BRAND.white, cursor: "pointer", overflow: "hidden", textAlign: "left",
+                            }}
+                          >
+                            <img src={style.image} alt={style.label} style={{ width: "100%", height: 72, objectFit: "cover", display: "block" }} />
+                            <div style={{ padding: "6px 8px", fontSize: 11, fontWeight: 700, color: BRAND.black, lineHeight: 1.2 }}>{style.label}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               </div>
             );
           })}
@@ -1355,7 +1514,7 @@ function OrderFormPage({ products, onSubmit }) {
           <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 14, fontWeight: 700, color: BRAND.black, marginBottom: 12 }}>Order Summary</h3>
           {items.map(it => (
             <div key={it.productId} style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: BRAND.grey, marginBottom: 6 }}>
-              <span>{it.name} {"\u00D7"} {it.qty}</span>
+              <span>{formatOrderItemLabel(it)} {"\u00D7"} {it.qty}</span>
               <span style={{ fontWeight: 600, color: BRAND.black }}>{formatPrice(parsePrice(it.price) * it.qty)}</span>
             </div>
           ))}
@@ -1505,7 +1664,7 @@ function OrderDetailPage({ order, onUpdate, onBack, showToast, logoWhite }) {
 function buildInvoiceHTML(order, logoBase64) {
   const itemRows = order.items.map(it => `
     <tr>
-      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${it.name}</td>
+      <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;">${formatOrderItemLabel(it)}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:center;">${it.qty}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;">${formatPrice(parsePrice(it.price))}</td>
       <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;font-size:13px;text-align:right;font-weight:600;">${formatPrice(parsePrice(it.price) * it.qty)}</td>
