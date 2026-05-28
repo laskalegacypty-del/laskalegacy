@@ -27,17 +27,29 @@ const SA_PROVINCES = [
 const HORSE_SEX_OPTIONS = ["Mare", "Stallion", "Gelding", "Filly", "Colt"];
 const RIDER_LEVELS = ["Beginner", "Novice", "Intermediate", "Advanced", "Professional"];
 const HORSE_DISCIPLINES = [
-  "Western Games",
   "Showjumping",
   "Dressage",
   "Eventing",
-  "Trail / Hacking",
-  "Endurance",
-  "Working Riding",
-  "Polocrosse",
+  "Western Games",
+  "Reining",
+  "Cutting",
   "Western Pleasure",
   "Barrel Racing",
-  "Reining",
+  "Polocrosse",
+  "Polo",
+  "Trail / Hacking",
+  "Endurance",
+  "Competitive Trail Riding",
+  "Thoroughbred Flat Racing",
+  "Combined Driving",
+  "Vaulting",
+  "Horse Archery",
+  "Natural Horsemanship",
+  "Breed Showing / Halter",
+  "Equine Assisted Therapy",
+  "Pony Club (Multi-discipline)",
+  "Gymkhana",
+  "Working Riding",
   "Companion",
   "Breeding",
   "Lead-Rein / Kids",
@@ -68,6 +80,211 @@ function horseHeightLabel(hh) {
   const n = Number(hh);
   if (!n || n <= 0) return "";
   return `${n} hh`;
+}
+
+function horseHealthChecks(horse) {
+  return [
+    [horse.ahs_up_to_date, "AHS"],
+    [horse.flu_up_to_date, "Flu"],
+    [horse.hooves_up_to_date, "Hooves"],
+    [horse.teeth_up_to_date, "Teeth"],
+    [horse.deworming_up_to_date, "Deworming"],
+  ].filter(([v]) => v).map(([, l]) => l);
+}
+
+// Normalise a phone number for use with wa.me (digits only, leading 0 -> SA country code).
+function normaliseWaNumber(phone) {
+  if (!phone) return "";
+  let digits = String(phone).replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  else if (digits.startsWith("0")) digits = "27" + digits.slice(1);
+  return digits;
+}
+
+function buildHorseEnquiryMessage(horse, contactName) {
+  const name = horse?.name || "this horse";
+  const greeting = contactName ? `Hi ${contactName},` : "Hi,";
+  const parts = [`${greeting} I saw ${name} for sale on Laska Legacy and I'd love to know more.`];
+  const facts = [
+    horse?.breed,
+    horse?.sex,
+    horseAgeLabel(horse?.age),
+  ].filter(Boolean).join(", ");
+  if (facts) parts.push(`(${facts})`);
+  parts.push("Is the horse still available? Could you share more details?");
+  return parts.join(" ");
+}
+
+function buildHorseWhatsAppLink(phone, horse, contactName) {
+  const digits = normaliseWaNumber(phone);
+  if (!digits) return "";
+  const msg = buildHorseEnquiryMessage(horse, contactName);
+  return `https://wa.me/${digits}?text=${encodeURIComponent(msg)}`;
+}
+
+function buildWhatsAppAd(horse) {
+  const lines = [];
+  lines.push(`\uD83D\uDC0E *${horse.name || "Horse for sale"}*`);
+  const priceLabel = formatHorsePrice(horse);
+  if (priceLabel) lines.push(`\uD83D\uDCB0 ${priceLabel}`);
+  lines.push("");
+
+  const headline = [
+    horse.breed ? (horse.registered ? `${horse.breed} (Registered)` : horse.breed) : null,
+    horse.sex,
+    horseAgeLabel(horse.age),
+    horseHeightLabel(horse.height_hh),
+    horse.color,
+  ].filter(Boolean);
+  if (headline.length) lines.push(headline.join(" \u2022 "));
+  if (horse.location || horse.province) {
+    lines.push(`\uD83D\uDCCD ${[horse.location, horse.province].filter(Boolean).join(", ")}`);
+  }
+  lines.push("");
+
+  if (horse.description) {
+    lines.push(horse.description.trim());
+    lines.push("");
+  }
+
+  if (horse.disciplines?.length) {
+    lines.push("*Disciplines:*");
+    horse.disciplines.forEach(d => lines.push(`\u2022 ${d}`));
+    lines.push("");
+  }
+
+  if (horse.experience) {
+    lines.push("*Experience & Training:*");
+    lines.push(horse.experience.trim());
+    lines.push("");
+  }
+
+  if (horse.temperament) {
+    lines.push(`*Temperament:* ${horse.temperament.trim()}`);
+    lines.push("");
+  }
+  if (horse.rider_level) {
+    lines.push(`*Suited rider:* ${horse.rider_level}`);
+    lines.push("");
+  }
+
+  const checks = horseHealthChecks(horse);
+  const hasPaperwork = checks.length || horse.passport || horse.microchipped || horse.registered || horse.vaccinations || horse.health_notes;
+  if (hasPaperwork) {
+    lines.push("*Paperwork & Health:*");
+    if (checks.length) lines.push(`\u2705 Up to date on: ${checks.join(", ")}`);
+    if (horse.registered) lines.push(`\u2705 Registered${horse.registration ? ` \u2014 ${horse.registration}` : ""}`);
+    if (horse.passport) lines.push(`\u2705 Passport${horse.passport_details ? ` (${horse.passport_details})` : ""}`);
+    if (horse.microchipped) lines.push("\u2705 Microchipped");
+    if (horse.vaccinations) lines.push(`\u2022 ${horse.vaccinations}`);
+    if (horse.health_notes) lines.push(`\u2022 ${horse.health_notes}`);
+    lines.push("");
+  }
+
+  lines.push("*Interested? Get in touch:*");
+  const waContacts = [
+    { name: horse.contact_name, phone: horse.contact_phone, email: horse.contact_email },
+    { name: horse.contact_name_2, phone: horse.contact_phone_2, email: horse.contact_email_2 },
+  ].filter(c => c.name || c.phone || c.email);
+  if (waContacts.length === 0) {
+    lines.push("\uD83D\uDCDE +27 72 585 8288");
+    lines.push("\u2709\uFE0F laskalegacypty@gmail.com");
+  } else {
+    waContacts.forEach((c, i) => {
+      if (i > 0) lines.push("");
+      if (c.name) lines.push(`*${c.name}*`);
+      if (c.phone) lines.push(`\uD83D\uDCDE ${c.phone}`);
+      if (c.email) lines.push(`\u2709\uFE0F ${c.email}`);
+    });
+  }
+
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function buildFacebookAd(horse) {
+  const lines = [];
+  lines.push("\uD83D\uDC0E\u2728 HORSE FOR SALE \u2728\uD83D\uDC0E");
+  lines.push("");
+
+  const facts = [
+    horse.breed ? (horse.registered ? `${horse.breed} (Registered)` : horse.breed) : null,
+    horse.sex,
+    horseAgeLabel(horse.age),
+    horseHeightLabel(horse.height_hh),
+    horse.color,
+  ].filter(Boolean).join(", ");
+  const opening = horse.name ? `Meet ${horse.name}` : "Beautiful horse looking for a new home";
+  lines.push(facts ? `${opening} \u2014 ${facts}.` : `${opening}.`);
+  lines.push("");
+
+  if (horse.location || horse.province) {
+    lines.push(`\uD83D\uDCCD Location: ${[horse.location, horse.province].filter(Boolean).join(", ")}`);
+  }
+  const priceLabel = formatHorsePrice(horse);
+  if (priceLabel) lines.push(`\uD83D\uDCB0 Price: ${priceLabel}`);
+  lines.push("");
+
+  if (horse.description) {
+    lines.push("\uD83D\uDCDD ABOUT");
+    lines.push(horse.description.trim());
+    lines.push("");
+  }
+
+  if (horse.disciplines?.length || horse.experience) {
+    lines.push("\uD83C\uDFAF DISCIPLINES & TRAINING");
+    if (horse.disciplines?.length) lines.push(horse.disciplines.join(" \u2022 "));
+    if (horse.experience) lines.push(horse.experience.trim());
+    lines.push("");
+  }
+
+  if (horse.temperament || horse.rider_level) {
+    lines.push("\uD83D\uDC9A TEMPERAMENT & RIDER");
+    if (horse.temperament) lines.push(horse.temperament.trim());
+    if (horse.rider_level) lines.push(`Suited to: ${horse.rider_level} riders`);
+    lines.push("");
+  }
+
+  const checks = horseHealthChecks(horse);
+  const hasPaperwork = checks.length || horse.passport || horse.microchipped || horse.registered || horse.vaccinations || horse.health_notes;
+  if (hasPaperwork) {
+    lines.push("\uD83E\uDE7A HEALTH & PAPERWORK");
+    if (checks.length) lines.push(`\u2705 Up to date on: ${checks.join(", ")}`);
+    if (horse.registered) lines.push(`\u2705 Registered${horse.registration ? ` \u2014 ${horse.registration}` : ""}`);
+    if (horse.passport) lines.push(`\u2705 Passport${horse.passport_details ? ` \u2014 ${horse.passport_details}` : ""}`);
+    if (horse.microchipped) lines.push("\u2705 Microchipped");
+    if (horse.vaccinations) lines.push(horse.vaccinations);
+    if (horse.health_notes) lines.push(horse.health_notes);
+    lines.push("");
+  }
+
+  lines.push("\uD83D\uDCE9 INTERESTED? GET IN TOUCH");
+  const fbContacts = [
+    { name: horse.contact_name, phone: horse.contact_phone, email: horse.contact_email },
+    { name: horse.contact_name_2, phone: horse.contact_phone_2, email: horse.contact_email_2 },
+  ].filter(c => c.name || c.phone || c.email);
+  if (fbContacts.length === 0) {
+    lines.push("WhatsApp / Call: +27 72 585 8288");
+    lines.push("Email: laskalegacypty@gmail.com");
+  } else {
+    fbContacts.forEach((c, i) => {
+      if (i > 0) lines.push("\u2014 or \u2014");
+      if (c.name) lines.push(c.name);
+      if (c.phone) lines.push(`WhatsApp / Call: ${c.phone}`);
+      if (c.email) lines.push(`Email: ${c.email}`);
+    });
+  }
+  lines.push("");
+
+  const tagify = (s) => "#" + String(s || "").replace(/[^a-zA-Z0-9]+/g, "");
+  const hashtagSet = new Set(["#HorsesForSale", "#HorsesForSaleSA", "#SouthAfricanHorses", "#HorseSale", "#LaskaLegacy"]);
+  if (horse.breed) hashtagSet.add(tagify(horse.breed));
+  if (horse.province) hashtagSet.add(tagify(horse.province));
+  (horse.disciplines || []).forEach(d => hashtagSet.add(tagify(d)));
+  const hashtags = Array.from(hashtagSet).filter(h => h.length > 1);
+  if (hashtags.length) lines.push(hashtags.join(" "));
+
+  return lines.join("\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
 // Helper: parse price string like "R1,250" to number
@@ -277,6 +494,7 @@ export default function LaskaLegacy() {
   const [horses, setHorses] = useState([]);
   const [selectedHorse, setSelectedHorse] = useState(null);
   const [editHorse, setEditHorse] = useState(null);
+  const [adHorse, setAdHorse] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [editPost, setEditPost] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -620,37 +838,6 @@ export default function LaskaLegacy() {
             </div>
           </section>
 
-          {(() => {
-            const featuredHorses = horses
-              .filter(h => h.featured && (h.status || "available") !== "sold")
-              .slice(0, 6);
-            if (featuredHorses.length === 0) return null;
-            return (
-              <section style={{ position: "relative", padding: "72px 24px", overflow: "hidden", background: `linear-gradient(135deg, ${BRAND.black} 0%, #0a1620 60%, ${BRAND.tealDark} 100%)` }}>
-                <div style={{ position: "absolute", inset: 0, opacity: 0.10, background: `radial-gradient(ellipse at 20% 30%, ${BRAND.teal}, transparent 60%), radial-gradient(ellipse at 80% 70%, ${BRAND.purple}, transparent 60%)` }} />
-                <div style={{ position: "relative", maxWidth: 1200, margin: "0 auto" }}>
-                  <div style={{ textAlign: "center", marginBottom: 36 }}>
-                    <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.teal, marginBottom: 8, fontWeight: 700 }}>{"\u2B50"} Handpicked</div>
-                    <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 32, color: BRAND.white, fontWeight: 800, marginBottom: 12 }}>Featured Horses</h2>
-                    <p style={{ fontSize: 15, color: "rgba(255,255,255,0.7)", maxWidth: 520, margin: "0 auto" }}>
-                      A closer look at some special horses currently available — ready for their next chapter.
-                    </p>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 22 }}>
-                    {featuredHorses.map((h, i) => (
-                      <div key={h.id} className="fade-up" style={{ animationDelay: `${i * 0.08}s` }}>
-                        <HorseCard horse={h} onClick={() => navigate("horse-detail", h)} />
-                      </div>
-                    ))}
-                  </div>
-                  <div style={{ textAlign: "center", marginTop: 36 }}>
-                    <button className="ll-btn ll-btn-primary" onClick={() => navigate("horses")}>Browse All Horses</button>
-                  </div>
-                </div>
-              </section>
-            );
-          })()}
-
           <section style={{ background: BRAND.offWhite, padding: "72px 24px" }}>
             <div style={{ maxWidth: 1200, margin: "0 auto" }}>
               <div style={{ textAlign: "center", marginBottom: 48 }}>
@@ -674,6 +861,37 @@ export default function LaskaLegacy() {
               </div>
             </div>
           </section>
+
+          {(() => {
+            const featuredHorses = horses
+              .filter(h => h.featured && (h.status || "available") !== "sold")
+              .slice(0, 6);
+            if (featuredHorses.length === 0) return null;
+            return (
+              <section style={{ position: "relative", padding: "72px 24px", overflow: "hidden", background: `linear-gradient(135deg, ${BRAND.black} 0%, #0a1620 60%, ${BRAND.tealDark} 100%)` }}>
+                <div style={{ position: "absolute", inset: 0, opacity: 0.10, background: `radial-gradient(ellipse at 20% 30%, ${BRAND.teal}, transparent 60%), radial-gradient(ellipse at 80% 70%, ${BRAND.purple}, transparent 60%)` }} />
+                <div style={{ position: "relative", maxWidth: 1200, margin: "0 auto" }}>
+                  <div style={{ textAlign: "center", marginBottom: 36 }}>
+                    <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.teal, marginBottom: 8, fontWeight: 700 }}>{"\u2B50"} Also Available</div>
+                    <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 32, color: BRAND.white, fontWeight: 800, marginBottom: 12 }}>Featured Horses</h2>
+                    <p style={{ fontSize: 15, color: "rgba(255,255,255,0.7)", maxWidth: 520, margin: "0 auto" }}>
+                      A closer look at some special horses currently available — ready for their next chapter.
+                    </p>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 22 }}>
+                    {featuredHorses.map((h, i) => (
+                      <div key={h.id} className="fade-up" style={{ animationDelay: `${i * 0.08}s` }}>
+                        <HorseCard horse={h} onClick={() => navigate("horse-detail", h)} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ textAlign: "center", marginTop: 36 }}>
+                    <button className="ll-btn ll-btn-primary" onClick={() => navigate("horses")}>Browse All Horses</button>
+                  </div>
+                </div>
+              </section>
+            );
+          })()}
 
           <section style={{ maxWidth: 800, margin: "0 auto", padding: "88px 24px", textAlign: "center" }}>
             <img src={LOGO_DARK} alt="Laska Legacy" style={{ height: 56, marginBottom: 28, opacity: 0.12 }} />
@@ -727,7 +945,7 @@ export default function LaskaLegacy() {
 
       {/* HORSE DETAIL — public */}
       {page === "horse-detail" && selectedHorse && (
-        <HorseDetailPage horse={selectedHorse} onBack={() => navigate("horses")} onEnquire={() => navigate("contact")} setLightbox={setLightbox} />
+        <HorseDetailPage horse={selectedHorse} onBack={() => navigate("horses")} setLightbox={setLightbox} />
       )}
 
       {/* PRODUCT DETAIL */}
@@ -1035,13 +1253,21 @@ export default function LaskaLegacy() {
             </div>
             <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-horse-edit", {
               id: "", name: "", breed: "", sex: "", age: "", height_hh: "", color: "", price: "", price_label: "",
-              location: "", province: "", vaccinations: "", passport: false, passport_details: "", registration: "",
-              microchipped: false, rider_level: "", disciplines: [], experience: "", temperament: "", health_notes: "",
+              location: "", province: "", vaccinations: "",
+              ahs_up_to_date: false, flu_up_to_date: false, hooves_up_to_date: false, teeth_up_to_date: false, deworming_up_to_date: false,
+              passport: false, passport_details: "", registration: "",
+              registered: false, microchipped: false, rider_level: "", disciplines: [], experience: "", temperament: "", health_notes: "",
               description: "", images: [], videos: [], status: "available", featured: false,
               contact_name: "", contact_email: "", contact_phone: "",
+              contact_name_2: "", contact_email_2: "", contact_phone_2: "",
             })}>{Icons.plus} Add Horse</button>
           </div>
           {horses.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No horses listed yet. Add your first one above!</p>}
+          {horses.length > 0 && (
+            <div style={{ background: BRAND.tealLight, border: `1px solid ${BRAND.teal}`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: BRAND.tealDark, marginBottom: 16 }}>
+              <strong>Tip:</strong> Click any horse row (or the Edit button) to update details, add more photos, change the price, or mark it as Reserved / Sold.
+            </div>
+          )}
           {horses.map(h => (
             <div key={h.id} className="admin-row" style={{ cursor: "pointer" }} onClick={() => navigate("admin-horse-edit", { ...h })}>
               <div style={{ width: 56, height: 56, borderRadius: 8, overflow: "hidden", flexShrink: 0, background: BRAND.offWhite, position: "relative" }}>
@@ -1062,7 +1288,11 @@ export default function LaskaLegacy() {
                 </div>
               </div>
               <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "4px 10px", borderRadius: 100, background: h.status === "available" ? BRAND.tealLight : h.status === "reserved" ? BRAND.purpleLight : BRAND.offWhite, color: h.status === "available" ? BRAND.tealDark : h.status === "reserved" ? BRAND.purple : BRAND.grey }}>{h.status || "available"}</span>
-              <button className="icon-btn" onClick={e => { e.stopPropagation(); navigate("admin-horse-edit", { ...h }); }}>{Icons.edit}</button>
+              <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={e => { e.stopPropagation(); navigate("admin-horse-edit", { ...h }); }}>{Icons.edit} Edit</button>
+              <button className="ll-btn ll-btn-purple ll-btn-sm" title="Create a WhatsApp or Facebook ad" onClick={e => { e.stopPropagation(); setAdHorse(h); }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+                Ad
+              </button>
               <button className="icon-btn" style={{ color: "#dc2626" }} onClick={e => { e.stopPropagation(); if (confirm("Remove " + h.name + "?")) handleDeleteHorse(h.id); }}>{Icons.trash}</button>
             </div>
           ))}
@@ -1104,6 +1334,11 @@ export default function LaskaLegacy() {
       {/* ADMIN ORDER DETAIL */}
       {page === "admin-order-detail" && adminAuth && selectedOrder && (
         <OrderDetailPage order={selectedOrder} onUpdate={(updated) => { handleUpdateOrder(updated); setSelectedOrder(updated); }} onBack={() => navigate("admin-orders")} showToast={showToast} logoWhite={LOGO_WHITE} />
+      )}
+
+      {/* HORSE AD GENERATOR MODAL */}
+      {adHorse && (
+        <HorseAdModal horse={adHorse} onClose={() => setAdHorse(null)} showToast={showToast} />
       )}
 
       {/* LIGHTBOX */}
@@ -2162,6 +2397,7 @@ function HorseCard({ horse, onClick }) {
           {horseAgeLabel(horse.age) && <span style={{ fontSize: 11, background: BRAND.tealLight, color: BRAND.tealDark, padding: "4px 9px", borderRadius: 100, fontWeight: 700 }}>{horseAgeLabel(horse.age)}</span>}
           {horseHeightLabel(horse.height_hh) && <span style={{ fontSize: 11, background: BRAND.tealLight, color: BRAND.tealDark, padding: "4px 9px", borderRadius: 100, fontWeight: 700 }}>{horseHeightLabel(horse.height_hh)}</span>}
           {horse.color && <span style={{ fontSize: 11, background: BRAND.offWhite, color: BRAND.grey, padding: "4px 9px", borderRadius: 100, fontWeight: 600 }}>{horse.color}</span>}
+          {horse.registered && <span style={{ fontSize: 11, background: BRAND.purpleLight, color: BRAND.purple, padding: "4px 9px", borderRadius: 100, fontWeight: 700 }}>{"\u2713"} Registered</span>}
         </div>
         {(horse.province || horse.location) && (
           <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: BRAND.grey, marginTop: 4 }}>
@@ -2364,13 +2600,41 @@ function HorsesPage({ horses, onSelect }) {
   );
 }
 
-function HorseDetailPage({ horse, onBack, onEnquire, setLightbox }) {
+function HorseDetailPage({ horse, onBack, setLightbox }) {
   const [active, setActive] = useState(0);
+  const [showContactPicker, setShowContactPicker] = useState(false);
   const imgs = horse.images || [];
   const cover = imgs[active] || imgs[0];
 
+  const contacts = [
+    { name: horse.contact_name, phone: horse.contact_phone, email: horse.contact_email },
+    { name: horse.contact_name_2, phone: horse.contact_phone_2, email: horse.contact_email_2 },
+  ].filter(c => c.name || c.phone || c.email);
+  const phoneContacts = contacts.filter(c => normaliseWaNumber(c.phone));
+
+  const openWhatsApp = (phone, name) => {
+    const href = buildHorseWhatsAppLink(phone, horse, name);
+    if (href && typeof window !== "undefined") window.open(href, "_blank", "noopener,noreferrer");
+  };
+
+  const handleEnquire = () => {
+    if (phoneContacts.length === 0) {
+      openWhatsApp("+27 72 585 8288", "Laska Legacy");
+      return;
+    }
+    if (phoneContacts.length === 1) {
+      const c = phoneContacts[0];
+      openWhatsApp(c.phone, c.name);
+      return;
+    }
+    setShowContactPicker(true);
+  };
+
+  const breedLabel = horse.breed
+    ? (horse.registered ? `${horse.breed} (Registered)` : horse.breed)
+    : (horse.registered ? "Registered" : "");
   const stats = [
-    ["Breed", horse.breed],
+    ["Breed", breedLabel],
     ["Sex", horse.sex],
     ["Age", horseAgeLabel(horse.age)],
     ["Height", horseHeightLabel(horse.height_hh)],
@@ -2450,14 +2714,54 @@ function HorseDetailPage({ horse, onBack, onEnquire, setLightbox }) {
             </div>
           )}
 
-          <button className="ll-btn ll-btn-primary" onClick={onEnquire} style={{ width: "100%", justifyContent: "center" }}>{Icons.send} Enquire About {horse.name}</button>
-          {(horse.contact_phone || horse.contact_email) && (
-            <div style={{ marginTop: 14, padding: 14, background: BRAND.offWhite, borderRadius: 10, fontSize: 13, color: BRAND.grey }}>
-              {horse.contact_name && <div style={{ fontWeight: 700, color: BRAND.black, marginBottom: 4 }}>{horse.contact_name}</div>}
-              {horse.contact_phone && <div>{"\u260E\uFE0F"} <a href={`tel:${horse.contact_phone}`} style={{ color: BRAND.teal, textDecoration: "none" }}>{horse.contact_phone}</a></div>}
-              {horse.contact_email && <div>{"\u2709\uFE0F"} <a href={`mailto:${horse.contact_email}`} style={{ color: BRAND.teal, textDecoration: "none" }}>{horse.contact_email}</a></div>}
+          <button
+            className="ll-btn ll-btn-primary"
+            onClick={handleEnquire}
+            style={{ width: "100%", justifyContent: "center" }}
+            title={phoneContacts.length > 1 ? "Choose who to message on WhatsApp" : "Open WhatsApp"}
+          >
+            <span aria-hidden style={{ fontSize: 16 }}>{"\uD83D\uDCAC"}</span> Enquire About {horse.name} on WhatsApp
+          </button>
+          {phoneContacts.length > 1 && (
+            <div style={{ marginTop: 8, fontSize: 12, color: BRAND.grey, textAlign: "center" }}>
+              You can choose between {phoneContacts.map(c => c.name).filter(Boolean).join(" or ") || "two contacts"}.
             </div>
           )}
+          {(() => {
+            if (contacts.length === 0) return null;
+            return (
+              <div style={{ marginTop: 14, padding: 14, background: BRAND.offWhite, borderRadius: 10, fontSize: 13, color: BRAND.grey, display: "flex", flexDirection: "column", gap: contacts.length > 1 ? 10 : 0 }}>
+                {contacts.map((c, i) => {
+                  const waHref = buildHorseWhatsAppLink(c.phone, horse, c.name);
+                  return (
+                    <div key={i} style={contacts.length > 1 && i > 0 ? { borderTop: `1px solid ${BRAND.greyLight}`, paddingTop: 10 } : {}}>
+                      {c.name && <div style={{ fontWeight: 700, color: BRAND.black, marginBottom: 4 }}>{c.name}</div>}
+                      {c.phone && (
+                        <div>
+                          {waHref ? (
+                            <a
+                              href={waHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="Chat on WhatsApp"
+                              style={{ color: BRAND.teal, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 6 }}
+                            >
+                              <span aria-hidden>{"\uD83D\uDCAC"}</span>
+                              <span>{c.phone}</span>
+                              <span style={{ fontSize: 11, color: BRAND.grey, fontWeight: 600 }}>(WhatsApp)</span>
+                            </a>
+                          ) : (
+                            <span>{"\u260E\uFE0F"} {c.phone}</span>
+                          )}
+                        </div>
+                      )}
+                      {c.email && <div>{"\u2709\uFE0F"} <a href={`mailto:${c.email}`} style={{ color: BRAND.teal, textDecoration: "none" }}>{c.email}</a></div>}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -2481,40 +2785,123 @@ function HorseDetailPage({ horse, onBack, onEnquire, setLightbox }) {
             <p style={{ fontSize: 15, lineHeight: 1.8, color: BRAND.grey, whiteSpace: "pre-wrap" }}>{horse.temperament}</p>
           </section>
         )}
-        {(horse.vaccinations || horse.passport || horse.passport_details || horse.microchipped || horse.health_notes) && (
-          <section>
-            <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, color: BRAND.black, marginBottom: 10 }}>Paperwork & Health</h3>
-            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-              {horse.passport && (
-                <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
-                  <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
-                  <span><strong style={{ color: BRAND.black }}>Passport:</strong> {horse.passport_details || "Yes"}</span>
-                </li>
+        {(() => {
+          const healthChecks = [
+            ["ahs_up_to_date", "AHS"],
+            ["flu_up_to_date", "Flu"],
+            ["hooves_up_to_date", "Hooves"],
+            ["teeth_up_to_date", "Teeth"],
+            ["deworming_up_to_date", "Deworming"],
+          ].filter(([k]) => horse[k]);
+          const hasAnyPaperwork = horse.vaccinations || horse.passport || horse.passport_details || horse.microchipped || horse.registered || horse.health_notes || healthChecks.length > 0;
+          if (!hasAnyPaperwork) return null;
+          return (
+            <section>
+              <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, color: BRAND.black, marginBottom: 10 }}>Paperwork & Health</h3>
+              {healthChecks.length > 0 && (
+                <div style={{ marginBottom: 12 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: BRAND.grey, marginBottom: 6 }}>Up to date on</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {healthChecks.map(([k, label]) => (
+                      <span key={k} style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 700, background: BRAND.tealLight, color: BRAND.tealDark, padding: "5px 11px", borderRadius: 100 }}>
+                        <span style={{ fontWeight: 800 }}>{"\u2713"}</span>{label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
-              {horse.microchipped && (
-                <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
-                  <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
-                  <span><strong style={{ color: BRAND.black }}>Microchipped</strong></span>
-                </li>
-              )}
-              {horse.vaccinations && (
-                <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
-                  <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
-                  <span><strong style={{ color: BRAND.black }}>Vaccinations:</strong> {horse.vaccinations}</span>
-                </li>
-              )}
-              {horse.health_notes && (
-                <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
-                  <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2022"}</span>
-                  <span style={{ whiteSpace: "pre-wrap" }}>{horse.health_notes}</span>
-                </li>
-              )}
-            </ul>
-          </section>
-        )}
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                {horse.registered && (
+                  <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                    <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
+                    <span><strong style={{ color: BRAND.black }}>Registered</strong>{horse.registration ? ` \u2014 ${horse.registration}` : ""}</span>
+                  </li>
+                )}
+                {horse.passport && (
+                  <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                    <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
+                    <span><strong style={{ color: BRAND.black }}>Passport:</strong> {horse.passport_details || "Yes"}</span>
+                  </li>
+                )}
+                {horse.microchipped && (
+                  <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                    <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
+                    <span><strong style={{ color: BRAND.black }}>Microchipped</strong></span>
+                  </li>
+                )}
+                {horse.vaccinations && (
+                  <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                    <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2022"}</span>
+                    <span style={{ whiteSpace: "pre-wrap" }}>{horse.vaccinations}</span>
+                  </li>
+                )}
+                {horse.health_notes && (
+                  <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                    <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2022"}</span>
+                    <span style={{ whiteSpace: "pre-wrap" }}>{horse.health_notes}</span>
+                  </li>
+                )}
+              </ul>
+            </section>
+          );
+        })()}
       </div>
 
       <style>{`@media(max-width:880px) { [style*="grid-template-columns: 1.2fr 1fr"] { grid-template-columns: 1fr !important; } }`}</style>
+
+      {showContactPicker && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Choose a contact to enquire about ${horse.name}`}
+          onClick={() => setShowContactPicker(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 20, zIndex: 1000 }}
+        >
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{ background: BRAND.white, borderRadius: 16, padding: 28, maxWidth: 460, width: "100%", boxShadow: "0 20px 60px rgba(0,0,0,0.3)" }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6, gap: 12 }}>
+              <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 20, fontWeight: 900, color: BRAND.black, margin: 0 }}>
+                Who would you like to message?
+              </h3>
+              <button
+                onClick={() => setShowContactPicker(false)}
+                aria-label="Close"
+                style={{ background: "none", border: "none", fontSize: 22, lineHeight: 1, color: BRAND.grey, cursor: "pointer", padding: 0 }}
+              >
+                {"\u2715"}
+              </button>
+            </div>
+            <p style={{ fontSize: 13, color: BRAND.grey, marginTop: 0, marginBottom: 18 }}>
+              {horse.name} has two contacts. Pick one to open WhatsApp with a ready-to-send message.
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {phoneContacts.map((c, i) => (
+                <button
+                  key={i}
+                  onClick={() => { setShowContactPicker(false); openWhatsApp(c.phone, c.name); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "14px 16px", borderRadius: 12, cursor: "pointer",
+                    border: `2px solid ${BRAND.greyLight}`, background: BRAND.white,
+                    textAlign: "left", transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND.teal; e.currentTarget.style.background = BRAND.tealLight; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = BRAND.greyLight; e.currentTarget.style.background = BRAND.white; }}
+                >
+                  <span aria-hidden style={{ fontSize: 24 }}>{"\uD83D\uDCAC"}</span>
+                  <span style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 800, color: BRAND.black, fontSize: 15 }}>{c.name || `Contact ${i + 1}`}</div>
+                    <div style={{ fontSize: 12, color: BRAND.grey, marginTop: 2 }}>{c.phone}</div>
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", color: BRAND.teal }}>WhatsApp {"\u2192"}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2590,8 +2977,10 @@ function AdminHorseEditPage({ horse, onSave, onCancel, showToast }) {
       <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
         {/* Photos */}
         <div>
-          <label className="ll-label">Photos</label>
-          <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 10 }}>Upload one or more photos. The first photo is used as the cover.</p>
+          <label className="ll-label">Photos ({form.images.length})</label>
+          <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 10 }}>
+            Add as many photos as you like {"\u2014"} hold <kbd style={{ background: BRAND.offWhite, border: `1px solid ${BRAND.greyLight}`, borderRadius: 4, padding: "1px 5px", fontFamily: "monospace", fontSize: 11 }}>Ctrl</kbd> (or <kbd style={{ background: BRAND.offWhite, border: `1px solid ${BRAND.greyLight}`, borderRadius: 4, padding: "1px 5px", fontFamily: "monospace", fontSize: 11 }}>{"\u2318"}</kbd> on Mac) when selecting files to pick more than one. Drag the arrows to reorder; the first photo is used as the cover. You can come back any time to add more.
+          </p>
           {form.images.length > 0 && (
             <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
               {form.images.map((src, i) => (
@@ -2612,8 +3001,12 @@ function AdminHorseEditPage({ horse, onSave, onCancel, showToast }) {
             onMouseLeave={e => { e.currentTarget.style.borderColor = BRAND.greyLight; e.currentTarget.style.background = BRAND.white; }}>
             <input type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: "none" }} />
             <div style={{ color: BRAND.teal, marginBottom: 6 }}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.black }}>{uploading ? "Uploading\u2026" : "Click to upload horse photos"}</div>
-            <div style={{ fontSize: 11, color: BRAND.grey, marginTop: 2 }}>JPG, PNG, WebP {"\u2014"} select multiple</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.black }}>
+              {uploading
+                ? "Uploading\u2026"
+                : (form.images.length > 0 ? "Click to add more photos" : "Click to upload horse photos")}
+            </div>
+            <div style={{ fontSize: 11, color: BRAND.grey, marginTop: 2 }}>JPG, PNG, WebP {"\u2014"} you can select multiple files at once</div>
           </label>
         </div>
 
@@ -2622,10 +3015,14 @@ function AdminHorseEditPage({ horse, onSave, onCancel, showToast }) {
           <label className="ll-label">Name *</label>
           <input className="ll-input" value={form.name || ""} onChange={e => set("name", e.target.value)} placeholder="e.g. Laska" />
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "start" }}>
           <div>
             <label className="ll-label">Breed</label>
             <input className="ll-input" value={form.breed || ""} onChange={e => set("breed", e.target.value)} placeholder="e.g. Boerperd, Thoroughbred" />
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginTop: 8 }}>
+              <input type="checkbox" checked={!!form.registered} onChange={e => set("registered", e.target.checked)} style={{ width: 18, height: 18, accentColor: BRAND.teal }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: BRAND.black }}>Registered horse</span>
+            </label>
           </div>
           <div>
             <label className="ll-label">Colour</label>
@@ -2727,8 +3124,32 @@ function AdminHorseEditPage({ horse, onSave, onCancel, showToast }) {
         <div style={{ background: BRAND.offWhite, borderRadius: 12, padding: 16 }}>
           <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.grey, marginBottom: 12 }}>Paperwork & Health</div>
           <div>
-            <label className="ll-label">Vaccinations</label>
-            <input className="ll-input" value={form.vaccinations || ""} onChange={e => set("vaccinations", e.target.value)} placeholder='e.g. "Up to date — AHS, flu, tetanus"' />
+            <label className="ll-label">Up to date on</label>
+            <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 8 }}>Tick the items this horse is current on.</p>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 8 }}>
+              {[
+                ["ahs_up_to_date", "AHS"],
+                ["flu_up_to_date", "Flu"],
+                ["hooves_up_to_date", "Hooves"],
+                ["teeth_up_to_date", "Teeth"],
+                ["deworming_up_to_date", "Deworming"],
+              ].map(([field, label]) => (
+                <label key={field} style={{
+                  display: "flex", alignItems: "center", gap: 8, cursor: "pointer",
+                  padding: "10px 12px", borderRadius: 8,
+                  border: form[field] ? `2px solid ${BRAND.teal}` : `1px solid ${BRAND.greyLight}`,
+                  background: form[field] ? BRAND.tealLight : BRAND.white,
+                  transition: "all 0.2s",
+                }}>
+                  <input type="checkbox" checked={!!form[field]} onChange={e => set(field, e.target.checked)} style={{ width: 18, height: 18, accentColor: BRAND.teal }} />
+                  <span style={{ fontSize: 14, fontWeight: 600, color: BRAND.black }}>{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <label className="ll-label">Additional vaccination / health notes (optional)</label>
+            <input className="ll-input" value={form.vaccinations || ""} onChange={e => set("vaccinations", e.target.value)} placeholder='e.g. "Tetanus done July 2025"' />
           </div>
           <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -2777,11 +3198,13 @@ function AdminHorseEditPage({ horse, onSave, onCancel, showToast }) {
 
         {/* Contact */}
         <div style={{ background: BRAND.offWhite, borderRadius: 12, padding: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.grey, marginBottom: 12 }}>Listing Contact (optional)</div>
-          <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 10 }}>Leave blank to use the default Laska Legacy contact details.</p>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.grey, marginBottom: 12 }}>Listing Contacts (optional)</div>
+          <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 10 }}>Up to two people can be contacted about this horse. Leave both blank to use the default Laska Legacy contact details.</p>
+
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: BRAND.tealDark, marginBottom: 8 }}>Contact 1</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label className="ll-label">Contact name</label>
+              <label className="ll-label">Name</label>
               <input className="ll-input" value={form.contact_name || ""} onChange={e => set("contact_name", e.target.value)} />
             </div>
             <div>
@@ -2792,6 +3215,24 @@ function AdminHorseEditPage({ horse, onSave, onCancel, showToast }) {
           <div style={{ marginTop: 10 }}>
             <label className="ll-label">Email</label>
             <input className="ll-input" type="email" value={form.contact_email || ""} onChange={e => set("contact_email", e.target.value)} />
+          </div>
+
+          <div style={{ height: 1, background: BRAND.greyLight, margin: "16px 0" }} />
+
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: BRAND.tealDark, marginBottom: 8 }}>Contact 2 (optional)</div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label className="ll-label">Name</label>
+              <input className="ll-input" value={form.contact_name_2 || ""} onChange={e => set("contact_name_2", e.target.value)} />
+            </div>
+            <div>
+              <label className="ll-label">Phone</label>
+              <input className="ll-input" type="tel" value={form.contact_phone_2 || ""} onChange={e => set("contact_phone_2", e.target.value)} />
+            </div>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <label className="ll-label">Email</label>
+            <input className="ll-input" type="email" value={form.contact_email_2 || ""} onChange={e => set("contact_email_2", e.target.value)} />
           </div>
         </div>
 
@@ -2813,6 +3254,149 @@ function AdminHorseEditPage({ horse, onSave, onCancel, showToast }) {
           <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={submit}>{form.id ? "Update Horse" : "Publish Horse"}</button>
           <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function HorseAdModal({ horse, onClose, showToast }) {
+  const [format, setFormat] = useState(null);
+  const [text, setText] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const pickFormat = (f) => {
+    setFormat(f);
+    setText(f === "whatsapp" ? buildWhatsAppAd(horse) : buildFacebookAd(horse));
+    setCopied(false);
+  };
+
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.getElementById("horse-ad-textarea");
+        if (ta) { ta.select(); document.execCommand("copy"); }
+      }
+      setCopied(true);
+      showToast?.("Ad copied to clipboard");
+      setTimeout(() => setCopied(false), 2500);
+    } catch (err) {
+      console.error("Copy failed:", err);
+      showToast?.("Could not copy. Select the text and copy manually.");
+    }
+  };
+
+  const photoCount = (horse.images || []).length;
+
+  return (
+    <div onClick={onClose} style={{
+      position: "fixed", inset: 0, zIndex: 1100, background: "rgba(0,0,0,0.78)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+      animation: "fadeIn 0.2s ease",
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: BRAND.white, borderRadius: 14, width: "100%", maxWidth: 640, maxHeight: "92vh",
+        display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,0.4)",
+      }}>
+        {/* Header */}
+        <div style={{ padding: "20px 24px", borderBottom: `1px solid ${BRAND.greyLight}`, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 4 }}>Ad generator</div>
+            <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 20, fontWeight: 800, color: BRAND.black, lineHeight: 1.2, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{horse.name || "Horse listing"}</h2>
+          </div>
+          <button onClick={onClose} aria-label="Close" style={{ background: BRAND.offWhite, border: "none", borderRadius: "50%", width: 36, height: 36, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: BRAND.grey, flexShrink: 0 }}>{Icons.x}</button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: 20, overflowY: "auto", flex: 1 }}>
+          {!format ? (
+            <div style={{ textAlign: "center", padding: "12px 4px 4px" }}>
+              <p style={{ fontSize: 14, color: BRAND.grey, marginBottom: 24 }}>
+                Pick a format and we'll write the ad for you using this horse's details. You can then copy it and paste into WhatsApp or Facebook.
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                <button onClick={() => pickFormat("whatsapp")} style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "28px 16px",
+                  background: BRAND.white, border: `2px solid ${BRAND.greyLight}`, borderRadius: 12, cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#25D366"; e.currentTarget.style.background = "#f0fdf6"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = BRAND.greyLight; e.currentTarget.style.background = BRAND.white; e.currentTarget.style.transform = ""; }}
+                >
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="#25D366"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: BRAND.black, marginBottom: 4 }}>WhatsApp</div>
+                    <div style={{ fontSize: 12, color: BRAND.grey }}>Short & punchy with emojis</div>
+                  </div>
+                </button>
+                <button onClick={() => pickFormat("facebook")} style={{
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 12, padding: "28px 16px",
+                  background: BRAND.white, border: `2px solid ${BRAND.greyLight}`, borderRadius: 12, cursor: "pointer",
+                  transition: "all 0.2s",
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "#1877F2"; e.currentTarget.style.background = "#eef4ff"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = BRAND.greyLight; e.currentTarget.style.background = BRAND.white; e.currentTarget.style.transform = ""; }}
+                >
+                  <svg width="44" height="44" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: BRAND.black, marginBottom: 4 }}>Facebook</div>
+                    <div style={{ fontSize: 12, color: BRAND.grey }}>Longer post with hashtags</div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, flexWrap: "wrap" }}>
+                <button onClick={() => pickFormat("whatsapp")} style={{
+                  padding: "6px 14px", borderRadius: 100, border: format === "whatsapp" ? `2px solid #25D366` : `1px solid ${BRAND.greyLight}`,
+                  background: format === "whatsapp" ? "#f0fdf6" : BRAND.white, fontSize: 12, fontWeight: 700, cursor: "pointer", color: BRAND.black,
+                }}>WhatsApp</button>
+                <button onClick={() => pickFormat("facebook")} style={{
+                  padding: "6px 14px", borderRadius: 100, border: format === "facebook" ? `2px solid #1877F2` : `1px solid ${BRAND.greyLight}`,
+                  background: format === "facebook" ? "#eef4ff" : BRAND.white, fontSize: 12, fontWeight: 700, cursor: "pointer", color: BRAND.black,
+                }}>Facebook</button>
+              </div>
+              <textarea
+                id="horse-ad-textarea"
+                value={text}
+                onChange={e => setText(e.target.value)}
+                style={{
+                  width: "100%", minHeight: 320, padding: 14, borderRadius: 10,
+                  border: `1.5px solid ${BRAND.greyLight}`, fontFamily: "'Inter', sans-serif",
+                  fontSize: 13, lineHeight: 1.6, color: BRAND.black, background: BRAND.offWhite,
+                  resize: "vertical", outline: "none",
+                }}
+              />
+              <p style={{ fontSize: 12, color: BRAND.grey, marginTop: 8, lineHeight: 1.5 }}>
+                {photoCount > 0
+                  ? `You can edit the text above before copying. Remember to also attach ${photoCount} photo${photoCount !== 1 ? "s" : ""} when posting.`
+                  : "You can edit the text above before copying. Don't forget to attach photos when posting."}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        {format && (
+          <div style={{ padding: "16px 20px", borderTop: `1px solid ${BRAND.greyLight}`, display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => setFormat(null)}>Change format</button>
+            <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={handleCopy}>
+              {copied ? (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  Copied
+                </>
+              ) : (
+                <>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                  Copy ad text
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
