@@ -12,6 +12,64 @@ const BRAND = {
   purpleLight: "#f0e8fd", grey: "#6b7280", greyLight: "#e5e7eb",
 };
 
+const SA_PROVINCES = [
+  "Eastern Cape",
+  "Free State",
+  "Gauteng",
+  "KwaZulu-Natal",
+  "Limpopo",
+  "Mpumalanga",
+  "North West",
+  "Northern Cape",
+  "Western Cape",
+];
+
+const HORSE_SEX_OPTIONS = ["Mare", "Stallion", "Gelding", "Filly", "Colt"];
+const RIDER_LEVELS = ["Beginner", "Novice", "Intermediate", "Advanced", "Professional"];
+const HORSE_DISCIPLINES = [
+  "Western Games",
+  "Showjumping",
+  "Dressage",
+  "Eventing",
+  "Trail / Hacking",
+  "Endurance",
+  "Working Riding",
+  "Polocrosse",
+  "Western Pleasure",
+  "Barrel Racing",
+  "Reining",
+  "Companion",
+  "Breeding",
+  "Lead-Rein / Kids",
+];
+const HORSE_STATUS_OPTIONS = [
+  { value: "available", label: "Available" },
+  { value: "reserved", label: "Reserved" },
+  { value: "sold", label: "Sold" },
+];
+
+function formatHorsePrice(horse) {
+  if (!horse) return "";
+  if (horse.price_label) return horse.price_label;
+  const n = Number(horse.price) || 0;
+  if (n <= 0) return "POA";
+  return formatPrice(n);
+}
+
+function horseAgeLabel(age) {
+  const n = Number(age);
+  if (!n || n <= 0) return "";
+  if (n < 1) return `${Math.round(n * 12)} months`;
+  const rounded = Number.isInteger(n) ? n : Number(n.toFixed(1));
+  return `${rounded} yr${rounded === 1 ? "" : "s"}`;
+}
+
+function horseHeightLabel(hh) {
+  const n = Number(hh);
+  if (!n || n <= 0) return "";
+  return `${n} hh`;
+}
+
 // Helper: parse price string like "R1,250" to number
 function parsePrice(s) { return parseFloat((s || "0").replace(/[^0-9.]/g, "")) || 0; }
 function formatPrice(n) { return "R" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
@@ -216,6 +274,9 @@ export default function LaskaLegacy() {
   const [gallery, setGallery] = useState([]);
   const [orders, setOrders] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
+  const [horses, setHorses] = useState([]);
+  const [selectedHorse, setSelectedHorse] = useState(null);
+  const [editHorse, setEditHorse] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [editPost, setEditPost] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
@@ -284,17 +345,19 @@ export default function LaskaLegacy() {
         });
         setCustomCategories(inferredCategories);
         setCustomSubcategories(inferredSubcategories);
-        const [msgs, gal, ords, posts] = await Promise.all([
+        const [msgs, gal, ords, posts, hrs] = await Promise.all([
           safeLoad(db.loadMessages, []),
           safeLoad(db.loadGallery, []),
           safeLoad(db.loadOrders, []),
           safeLoad(db.loadBlogPosts, []),
+          safeLoad(db.loadHorses, []),
         ]);
         if (cancelled) return;
         setMessages(msgs);
         setGallery(gal);
         setOrders(ords);
         setBlogPosts(posts);
+        setHorses(hrs);
       } catch (err) {
         console.error("Failed to load site data:", err);
       } finally {
@@ -363,6 +426,8 @@ export default function LaskaLegacy() {
       if (p === "admin-order-detail") setSelectedOrder(data);
       if (p === "blog-post") setSelectedPost(data);
       if (p === "admin-blog-edit") setEditPost(data);
+      if (p === "horse-detail") setSelectedHorse(data);
+      if (p === "admin-horse-edit") setEditHorse(data);
     }
     window.scrollTo?.({ top: 0 });
   };
@@ -422,6 +487,20 @@ export default function LaskaLegacy() {
     await db.deleteBlogPost(id);
     setBlogPosts(blogPosts.filter(p => p.id !== id));
     showToast("Post deleted");
+  };
+  const handleSaveHorse = async (horse) => {
+    const saved = await db.saveHorse(horse);
+    if (horse.id) {
+      setHorses(horses.map(h => h.id === saved.id ? saved : h));
+    } else {
+      setHorses([saved, ...horses]);
+    }
+    showToast("Horse saved"); navigate("admin-horses");
+  };
+  const handleDeleteHorse = async (id) => {
+    await db.deleteHorse(id);
+    setHorses(horses.filter(h => h.id !== id));
+    showToast("Horse removed");
   };
 
   if (loading) return (
@@ -487,8 +566,8 @@ export default function LaskaLegacy() {
             </div>
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 28 }} className="desktop-nav">
-            {[["home", "Home"], ["shop", "Shop"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
-              <button key={key} className={`nav-link ${page === key || page === "blog-post" && key === "blog" || (page.startsWith("admin") && key === "admin") ? "active" : ""}`} onClick={() => navigate(key)}>{label}</button>
+            {[["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
+              <button key={key} className={`nav-link ${page === key || (page === "blog-post" && key === "blog") || (page === "horse-detail" && key === "horses") || (page.startsWith("admin") && key === "admin") ? "active" : ""}`} onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
           <button onClick={() => setMobileMenu(!mobileMenu)} style={{ background: "none", border: "none", cursor: "pointer", color: BRAND.white, display: "none" }} className="mobile-toggle">{mobileMenu ? Icons.x : Icons.menu}</button>
@@ -496,7 +575,7 @@ export default function LaskaLegacy() {
         <style>{`@media(max-width:768px) { .desktop-nav { display:none !important; } .mobile-toggle { display:flex !important; } }`}</style>
         {mobileMenu && (
           <div className="slide-in" style={{ position: "absolute", top: 68, right: 0, background: BRAND.black, padding: "20px 32px", borderRadius: "0 0 0 12px", boxShadow: "0 8px 30px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", gap: 16, zIndex: 99 }}>
-            {[["home", "Home"], ["shop", "Shop"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
+            {[["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
               <button key={key} className="nav-link" onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -540,6 +619,37 @@ export default function LaskaLegacy() {
               ))}
             </div>
           </section>
+
+          {(() => {
+            const featuredHorses = horses
+              .filter(h => h.featured && (h.status || "available") !== "sold")
+              .slice(0, 6);
+            if (featuredHorses.length === 0) return null;
+            return (
+              <section style={{ position: "relative", padding: "72px 24px", overflow: "hidden", background: `linear-gradient(135deg, ${BRAND.black} 0%, #0a1620 60%, ${BRAND.tealDark} 100%)` }}>
+                <div style={{ position: "absolute", inset: 0, opacity: 0.10, background: `radial-gradient(ellipse at 20% 30%, ${BRAND.teal}, transparent 60%), radial-gradient(ellipse at 80% 70%, ${BRAND.purple}, transparent 60%)` }} />
+                <div style={{ position: "relative", maxWidth: 1200, margin: "0 auto" }}>
+                  <div style={{ textAlign: "center", marginBottom: 36 }}>
+                    <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.teal, marginBottom: 8, fontWeight: 700 }}>{"\u2B50"} Handpicked</div>
+                    <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 32, color: BRAND.white, fontWeight: 800, marginBottom: 12 }}>Featured Horses</h2>
+                    <p style={{ fontSize: 15, color: "rgba(255,255,255,0.7)", maxWidth: 520, margin: "0 auto" }}>
+                      A closer look at some special horses currently available — ready for their next chapter.
+                    </p>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 22 }}>
+                    {featuredHorses.map((h, i) => (
+                      <div key={h.id} className="fade-up" style={{ animationDelay: `${i * 0.08}s` }}>
+                        <HorseCard horse={h} onClick={() => navigate("horse-detail", h)} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ textAlign: "center", marginTop: 36 }}>
+                    <button className="ll-btn ll-btn-primary" onClick={() => navigate("horses")}>Browse All Horses</button>
+                  </div>
+                </div>
+              </section>
+            );
+          })()}
 
           <section style={{ background: BRAND.offWhite, padding: "72px 24px" }}>
             <div style={{ maxWidth: 1200, margin: "0 auto" }}>
@@ -608,6 +718,16 @@ export default function LaskaLegacy() {
             <p style={{ textAlign: "center", color: BRAND.grey, padding: 48, fontSize: 15 }}>No products in this category yet.</p>
           )}
         </div>
+      )}
+
+      {/* HORSES FOR SALE — public listing */}
+      {page === "horses" && (
+        <HorsesPage horses={horses} onSelect={(h) => navigate("horse-detail", h)} />
+      )}
+
+      {/* HORSE DETAIL — public */}
+      {page === "horse-detail" && selectedHorse && (
+        <HorseDetailPage horse={selectedHorse} onBack={() => navigate("horses")} onEnquire={() => navigate("contact")} setLightbox={setLightbox} />
       )}
 
       {/* PRODUCT DETAIL */}
@@ -808,6 +928,10 @@ export default function LaskaLegacy() {
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                 Blog ({blogPosts.length})
               </button>
+              <button className="ll-btn ll-btn-purple ll-btn-sm" onClick={() => navigate("admin-horses")}>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>{"\uD83D\uDC0E"}</span>
+                Horses ({horses.length})
+              </button>
               <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-edit", { id: "", name: "", category: "bridles", subcategory: "", price: "", description: "", images: [], featured: false })}>{Icons.plus} Add Product</button>
             </div>
           </div>
@@ -900,6 +1024,56 @@ export default function LaskaLegacy() {
         <BlogEditPage post={editPost} onSave={handleSavePost} onCancel={() => navigate("admin-blog")} showToast={showToast} />
       )}
 
+      {/* ADMIN HORSES — list */}
+      {page === "admin-horses" && adminAuth && (
+        <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
+          <button onClick={() => navigate("admin")} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Admin</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
+            <div>
+              <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>Horses for Sale</h1>
+              <p style={{ fontSize: 13, color: BRAND.grey }}>{horses.length} listing{horses.length !== 1 ? "s" : ""} {"\u00B7"} {horses.filter(h => h.status === "available").length} available</p>
+            </div>
+            <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-horse-edit", {
+              id: "", name: "", breed: "", sex: "", age: "", height_hh: "", color: "", price: "", price_label: "",
+              location: "", province: "", vaccinations: "", passport: false, passport_details: "", registration: "",
+              microchipped: false, rider_level: "", disciplines: [], experience: "", temperament: "", health_notes: "",
+              description: "", images: [], videos: [], status: "available", featured: false,
+              contact_name: "", contact_email: "", contact_phone: "",
+            })}>{Icons.plus} Add Horse</button>
+          </div>
+          {horses.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No horses listed yet. Add your first one above!</p>}
+          {horses.map(h => (
+            <div key={h.id} className="admin-row" style={{ cursor: "pointer" }} onClick={() => navigate("admin-horse-edit", { ...h })}>
+              <div style={{ width: 56, height: 56, borderRadius: 8, overflow: "hidden", flexShrink: 0, background: BRAND.offWhite, position: "relative" }}>
+                {h.images?.[0] ? (
+                  <img src={h.images[0]} alt={h.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                ) : (
+                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22 }}>{"\uD83D\uDC0E"}</div>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>
+                  {h.name}
+                  {h.featured && <span style={{ marginLeft: 8, fontSize: 10, color: BRAND.purple, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase" }}>{"\u2B50"} Featured</span>}
+                </div>
+                <div style={{ fontSize: 12, color: BRAND.grey }}>
+                  {[h.breed, h.sex, horseAgeLabel(h.age), h.province].filter(Boolean).join(" \u00B7 ")}
+                  {" \u00B7 "}{formatHorsePrice(h)}
+                </div>
+              </div>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "4px 10px", borderRadius: 100, background: h.status === "available" ? BRAND.tealLight : h.status === "reserved" ? BRAND.purpleLight : BRAND.offWhite, color: h.status === "available" ? BRAND.tealDark : h.status === "reserved" ? BRAND.purple : BRAND.grey }}>{h.status || "available"}</span>
+              <button className="icon-btn" onClick={e => { e.stopPropagation(); navigate("admin-horse-edit", { ...h }); }}>{Icons.edit}</button>
+              <button className="icon-btn" style={{ color: "#dc2626" }} onClick={e => { e.stopPropagation(); if (confirm("Remove " + h.name + "?")) handleDeleteHorse(h.id); }}>{Icons.trash}</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ADMIN HORSE EDIT */}
+      {page === "admin-horse-edit" && adminAuth && editHorse && (
+        <AdminHorseEditPage horse={editHorse} onSave={handleSaveHorse} onCancel={() => navigate("admin-horses")} showToast={showToast} />
+      )}
+
       {/* ADMIN ORDERS */}
       {page === "admin-orders" && adminAuth && (
         <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
@@ -971,6 +1145,7 @@ export default function LaskaLegacy() {
 
         <div style={{ display: "flex", gap: 24, justifyContent: "center", flexWrap: "wrap", fontSize: 13, marginBottom: 8 }}>
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("shop")}>Shop</button>
+          <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("horses")}>Horses</button>
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("gallery")}>Gallery</button>
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("blog")}>Blog</button>
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("order")}>Order</button>
@@ -1935,6 +2110,707 @@ function BlogEditPage({ post, onSave, onCancel, showToast }) {
           <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.title.trim()) onSave(form); }}>
             {form.id ? "Update Post" : "Publish Post"}
           </button>
+          <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Horses for Sale ───
+function HorseCard({ horse, onClick }) {
+  const cover = horse.images?.[0];
+  const isUnavailable = horse.status && horse.status !== "available";
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        background: BRAND.white, borderRadius: 14, overflow: "hidden", cursor: "pointer",
+        border: `1px solid ${BRAND.greyLight}`, transition: "all 0.3s ease",
+        display: "flex", flexDirection: "column",
+      }}
+      onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 18px 50px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor = BRAND.teal; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.borderColor = BRAND.greyLight; }}
+    >
+      <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", background: BRAND.offWhite }}>
+        {cover ? (
+          <img src={cover} alt={horse.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", filter: isUnavailable ? "grayscale(0.4) brightness(0.92)" : "none" }} />
+        ) : (
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, opacity: 0.4 }}>{"\uD83D\uDC0E"}</div>
+        )}
+        <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {horse.featured && (
+            <span style={{ background: BRAND.purple, color: BRAND.white, fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", padding: "5px 10px", borderRadius: 100 }}>Featured</span>
+          )}
+          {horse.status === "reserved" && (
+            <span style={{ background: BRAND.purple, color: BRAND.white, fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", padding: "5px 10px", borderRadius: 100 }}>Reserved</span>
+          )}
+          {horse.status === "sold" && (
+            <span style={{ background: BRAND.black, color: BRAND.white, fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", padding: "5px 10px", borderRadius: 100 }}>Sold</span>
+          )}
+        </div>
+        <div style={{ position: "absolute", bottom: 12, right: 12, background: "rgba(0,0,0,0.78)", color: BRAND.white, fontSize: 14, fontWeight: 800, padding: "6px 12px", borderRadius: 100, backdropFilter: "blur(4px)" }}>
+          {formatHorsePrice(horse)}
+        </div>
+      </div>
+      <div style={{ padding: "18px 20px 22px", display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
+        <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 19, color: BRAND.black, fontWeight: 800, lineHeight: 1.2 }}>{horse.name}</h3>
+        <div style={{ fontSize: 12, color: BRAND.grey, fontWeight: 600 }}>
+          {[horse.breed, horse.sex].filter(Boolean).join(" \u00B7 ") || "Horse"}
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 4 }}>
+          {horseAgeLabel(horse.age) && <span style={{ fontSize: 11, background: BRAND.tealLight, color: BRAND.tealDark, padding: "4px 9px", borderRadius: 100, fontWeight: 700 }}>{horseAgeLabel(horse.age)}</span>}
+          {horseHeightLabel(horse.height_hh) && <span style={{ fontSize: 11, background: BRAND.tealLight, color: BRAND.tealDark, padding: "4px 9px", borderRadius: 100, fontWeight: 700 }}>{horseHeightLabel(horse.height_hh)}</span>}
+          {horse.color && <span style={{ fontSize: 11, background: BRAND.offWhite, color: BRAND.grey, padding: "4px 9px", borderRadius: 100, fontWeight: 600 }}>{horse.color}</span>}
+        </div>
+        {(horse.province || horse.location) && (
+          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: BRAND.grey, marginTop: 4 }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            <span>{[horse.location, horse.province].filter(Boolean).join(", ")}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HorsesPage({ horses, onSelect }) {
+  const [search, setSearch] = useState("");
+  const [sex, setSex] = useState("all");
+  const [breed, setBreed] = useState("all");
+  const [province, setProvince] = useState("all");
+  const [discipline, setDiscipline] = useState("all");
+  const [riderLevel, setRiderLevel] = useState("all");
+  const [status, setStatus] = useState("available");
+  const [minAge, setMinAge] = useState("");
+  const [maxAge, setMaxAge] = useState("");
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+  const [sort, setSort] = useState("featured");
+  const [showFilters, setShowFilters] = useState(false);
+
+  const breeds = Array.from(new Set(horses.map(h => h.breed).filter(Boolean))).sort();
+  const provinces = Array.from(new Set(horses.map(h => h.province).filter(Boolean))).sort();
+  const disciplineSet = Array.from(new Set(horses.flatMap(h => h.disciplines || []).filter(Boolean))).sort();
+
+  const filtered = horses.filter(h => {
+    if (status !== "all" && (h.status || "available") !== status) return false;
+    if (sex !== "all" && h.sex !== sex) return false;
+    if (breed !== "all" && h.breed !== breed) return false;
+    if (province !== "all" && h.province !== province) return false;
+    if (riderLevel !== "all" && h.rider_level !== riderLevel) return false;
+    if (discipline !== "all" && !(h.disciplines || []).includes(discipline)) return false;
+    if (minAge !== "" && Number(h.age) < Number(minAge)) return false;
+    if (maxAge !== "" && Number(h.age) > Number(maxAge)) return false;
+    if (minPrice !== "" && Number(h.price) < Number(minPrice)) return false;
+    if (maxPrice !== "" && Number(h.price) > Number(maxPrice)) return false;
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      const hay = [h.name, h.breed, h.color, h.location, h.province, h.description, h.experience].filter(Boolean).join(" ").toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const sorted = [...filtered].sort((a, b) => {
+    if (sort === "price-asc") return (Number(a.price) || 0) - (Number(b.price) || 0);
+    if (sort === "price-desc") return (Number(b.price) || 0) - (Number(a.price) || 0);
+    if (sort === "age-asc") return (Number(a.age) || 0) - (Number(b.age) || 0);
+    if (sort === "age-desc") return (Number(b.age) || 0) - (Number(a.age) || 0);
+    if (sort === "newest") return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+    // featured
+    if (a.featured !== b.featured) return a.featured ? -1 : 1;
+    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+  });
+
+  const activeCount = [
+    sex !== "all", breed !== "all", province !== "all", riderLevel !== "all", discipline !== "all",
+    status !== "available", minAge !== "", maxAge !== "", minPrice !== "", maxPrice !== "",
+  ].filter(Boolean).length;
+
+  const resetAll = () => {
+    setSex("all"); setBreed("all"); setProvince("all"); setRiderLevel("all"); setDiscipline("all");
+    setStatus("available"); setMinAge(""); setMaxAge(""); setMinPrice(""); setMaxPrice(""); setSearch(""); setSort("featured");
+  };
+
+  return (
+    <div className="fade-in">
+      {/* Hero */}
+      <section style={{ position: "relative", overflow: "hidden", padding: "84px 24px 76px", textAlign: "center", background: `linear-gradient(135deg, ${BRAND.black} 0%, #0a1620 55%, ${BRAND.tealDark} 100%)` }}>
+        <div style={{ position: "absolute", inset: 0, opacity: 0.12, background: `radial-gradient(ellipse at 20% 30%, ${BRAND.teal}, transparent 60%), radial-gradient(ellipse at 80% 70%, ${BRAND.purple}, transparent 60%)` }} />
+        <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }} className="fade-up">
+          <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.teal, marginBottom: 14, fontWeight: 700 }}>{"\uD83D\uDC0E"} Find Your Next Partner</div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "clamp(34px, 6vw, 56px)", color: BRAND.white, fontWeight: 900, lineHeight: 1.05, marginBottom: 18, letterSpacing: -1 }}>
+            Horses For Sale
+          </h1>
+          <p style={{ fontSize: 16, color: "rgba(255,255,255,0.75)", lineHeight: 1.7, maxWidth: 520, margin: "0 auto" }}>
+            Hand-selected horses ready for their next chapter. From quiet companions to seasoned competitors — find the one that fits.
+          </p>
+        </div>
+      </section>
+
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "36px 24px 80px" }}>
+        {/* Search + sort */}
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "stretch", marginBottom: 16 }}>
+          <div style={{ position: "relative", flex: "1 1 280px" }}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={BRAND.grey} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)" }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input className="ll-input" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search by name, breed, colour..." style={{ paddingLeft: 42 }} />
+          </div>
+          <select className="ll-input" value={sort} onChange={e => setSort(e.target.value)} style={{ flex: "0 1 200px" }}>
+            <option value="featured">Featured first</option>
+            <option value="newest">Newest first</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="age-asc">Age: youngest first</option>
+            <option value="age-desc">Age: oldest first</option>
+          </select>
+          <button className="ll-btn ll-btn-outline" onClick={() => setShowFilters(!showFilters)} style={{ flex: "0 0 auto" }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            Filters{activeCount > 0 ? ` (${activeCount})` : ""}
+          </button>
+        </div>
+
+        {/* Filter panel */}
+        {showFilters && (
+          <div style={{ background: BRAND.offWhite, borderRadius: 14, padding: 24, marginBottom: 24, border: `1px solid ${BRAND.greyLight}` }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 16 }}>
+              <div>
+                <label className="ll-label">Sex</label>
+                <select className="ll-input" value={sex} onChange={e => setSex(e.target.value)}>
+                  <option value="all">Any</option>
+                  {HORSE_SEX_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="ll-label">Breed</label>
+                <select className="ll-input" value={breed} onChange={e => setBreed(e.target.value)}>
+                  <option value="all">Any breed</option>
+                  {breeds.map(b => <option key={b} value={b}>{b}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="ll-label">Province</label>
+                <select className="ll-input" value={province} onChange={e => setProvince(e.target.value)}>
+                  <option value="all">Anywhere</option>
+                  {(provinces.length ? provinces : SA_PROVINCES).map(p => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="ll-label">Discipline</label>
+                <select className="ll-input" value={discipline} onChange={e => setDiscipline(e.target.value)}>
+                  <option value="all">Any</option>
+                  {(disciplineSet.length ? disciplineSet : HORSE_DISCIPLINES).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="ll-label">Suited rider</label>
+                <select className="ll-input" value={riderLevel} onChange={e => setRiderLevel(e.target.value)}>
+                  <option value="all">Any level</option>
+                  {RIDER_LEVELS.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="ll-label">Status</label>
+                <select className="ll-input" value={status} onChange={e => setStatus(e.target.value)}>
+                  <option value="all">All listings</option>
+                  <option value="available">Available</option>
+                  <option value="reserved">Reserved</option>
+                  <option value="sold">Sold</option>
+                </select>
+              </div>
+              <div>
+                <label className="ll-label">Age (years)</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input className="ll-input" type="number" min="0" value={minAge} onChange={e => setMinAge(e.target.value)} placeholder="Min" />
+                  <input className="ll-input" type="number" min="0" value={maxAge} onChange={e => setMaxAge(e.target.value)} placeholder="Max" />
+                </div>
+              </div>
+              <div>
+                <label className="ll-label">Price (R)</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input className="ll-input" type="number" min="0" value={minPrice} onChange={e => setMinPrice(e.target.value)} placeholder="Min" />
+                  <input className="ll-input" type="number" min="0" value={maxPrice} onChange={e => setMaxPrice(e.target.value)} placeholder="Max" />
+                </div>
+              </div>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+              <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={resetAll}>Reset filters</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ fontSize: 13, color: BRAND.grey, marginBottom: 18 }}>
+          Showing <strong style={{ color: BRAND.black }}>{sorted.length}</strong> of {horses.length} horse{horses.length !== 1 ? "s" : ""}
+        </div>
+
+        {sorted.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "72px 24px", background: BRAND.offWhite, borderRadius: 14 }}>
+            <div style={{ fontSize: 64, marginBottom: 12, opacity: 0.4 }}>{"\uD83D\uDC0E"}</div>
+            <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 22, fontWeight: 800, color: BRAND.black, marginBottom: 8 }}>No horses match your search</h3>
+            <p style={{ fontSize: 14, color: BRAND.grey, marginBottom: 20 }}>Try widening the filters or clearing them to see all listings.</p>
+            <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={resetAll}>Clear all filters</button>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 24 }}>
+            {sorted.map((h, i) => (
+              <div key={h.id} className="fade-up" style={{ animationDelay: `${i * 0.05}s` }}>
+                <HorseCard horse={h} onClick={() => onSelect(h)} />
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function HorseDetailPage({ horse, onBack, onEnquire, setLightbox }) {
+  const [active, setActive] = useState(0);
+  const imgs = horse.images || [];
+  const cover = imgs[active] || imgs[0];
+
+  const stats = [
+    ["Breed", horse.breed],
+    ["Sex", horse.sex],
+    ["Age", horseAgeLabel(horse.age)],
+    ["Height", horseHeightLabel(horse.height_hh)],
+    ["Colour", horse.color],
+    ["Location", [horse.location, horse.province].filter(Boolean).join(", ")],
+    ["Suited rider", horse.rider_level],
+    ["Registration", horse.registration],
+  ].filter(([, v]) => v);
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 1100, margin: "0 auto", padding: "32px 24px 80px" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Horses</button>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 40, alignItems: "start" }}>
+        {/* Gallery */}
+        <div>
+          <div style={{ width: "100%", aspectRatio: "4/3", borderRadius: 14, overflow: "hidden", background: BRAND.offWhite, position: "relative", cursor: cover ? "zoom-in" : "default" }} onClick={() => cover && setLightbox?.({ src: cover, caption: horse.name })}>
+            {cover ? (
+              <img src={cover} alt={horse.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            ) : (
+              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 96, opacity: 0.3 }}>{"\uD83D\uDC0E"}</div>
+            )}
+            <div style={{ position: "absolute", top: 14, left: 14, display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {horse.featured && <span style={{ background: BRAND.purple, color: BRAND.white, fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", padding: "6px 12px", borderRadius: 100 }}>Featured</span>}
+              {horse.status === "reserved" && <span style={{ background: BRAND.purple, color: BRAND.white, fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", padding: "6px 12px", borderRadius: 100 }}>Reserved</span>}
+              {horse.status === "sold" && <span style={{ background: BRAND.black, color: BRAND.white, fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", padding: "6px 12px", borderRadius: 100 }}>Sold</span>}
+              {(!horse.status || horse.status === "available") && <span style={{ background: BRAND.teal, color: BRAND.white, fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", padding: "6px 12px", borderRadius: 100 }}>Available</span>}
+            </div>
+          </div>
+          {imgs.length > 1 && (
+            <div style={{ display: "flex", gap: 8, marginTop: 12, overflowX: "auto", paddingBottom: 4 }}>
+              {imgs.map((src, i) => (
+                <button key={i} onClick={() => setActive(i)} style={{ width: 84, height: 84, borderRadius: 8, overflow: "hidden", border: i === active ? `2px solid ${BRAND.teal}` : "2px solid transparent", cursor: "pointer", flexShrink: 0, padding: 0, background: BRAND.offWhite, transition: "all 0.2s", opacity: i === active ? 1 : 0.7 }}>
+                  <img src={src} alt={`${horse.name} ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                </button>
+              ))}
+            </div>
+          )}
+          {horse.videos?.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 20 }}>
+              {horse.videos.map((url, i) => {
+                const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
+                if (ytMatch) return <div key={i} style={{ position: "relative", paddingBottom: "56.25%", borderRadius: 10, overflow: "hidden", background: BRAND.black }}><iframe src={`https://www.youtube.com/embed/${ytMatch[1]}`} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} allowFullScreen title={`Video ${i + 1}`} /></div>;
+                return <a key={i} href={url} target="_blank" rel="noopener noreferrer" style={{ padding: 14, borderRadius: 10, background: BRAND.offWhite, color: BRAND.teal, fontWeight: 700, fontSize: 13, textDecoration: "none", textAlign: "center" }}>Watch video {"\u2192"}</a>;
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 36, color: BRAND.black, fontWeight: 900, lineHeight: 1.1, marginBottom: 10 }}>{horse.name}</h1>
+          <div style={{ fontSize: 14, color: BRAND.grey, fontWeight: 600, marginBottom: 18 }}>
+            {[horse.breed, horse.sex].filter(Boolean).join(" \u00B7 ") || "Horse"}
+          </div>
+          <div style={{ fontSize: 32, fontWeight: 900, color: BRAND.purple, marginBottom: 24 }}>{formatHorsePrice(horse)}</div>
+
+          {stats.length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10, marginBottom: 24, background: BRAND.offWhite, borderRadius: 12, padding: 16 }}>
+              {stats.map(([k, v]) => (
+                <div key={k}>
+                  <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: BRAND.grey, marginBottom: 2 }}>{k}</div>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.black }}>{v}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {horse.disciplines?.length > 0 && (
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.grey, marginBottom: 8 }}>Disciplines</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {horse.disciplines.map(d => (
+                  <span key={d} style={{ fontSize: 12, background: BRAND.tealLight, color: BRAND.tealDark, padding: "6px 12px", borderRadius: 100, fontWeight: 700 }}>{d}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <button className="ll-btn ll-btn-primary" onClick={onEnquire} style={{ width: "100%", justifyContent: "center" }}>{Icons.send} Enquire About {horse.name}</button>
+          {(horse.contact_phone || horse.contact_email) && (
+            <div style={{ marginTop: 14, padding: 14, background: BRAND.offWhite, borderRadius: 10, fontSize: 13, color: BRAND.grey }}>
+              {horse.contact_name && <div style={{ fontWeight: 700, color: BRAND.black, marginBottom: 4 }}>{horse.contact_name}</div>}
+              {horse.contact_phone && <div>{"\u260E\uFE0F"} <a href={`tel:${horse.contact_phone}`} style={{ color: BRAND.teal, textDecoration: "none" }}>{horse.contact_phone}</a></div>}
+              {horse.contact_email && <div>{"\u2709\uFE0F"} <a href={`mailto:${horse.contact_email}`} style={{ color: BRAND.teal, textDecoration: "none" }}>{horse.contact_email}</a></div>}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Long-form sections */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 28, marginTop: 48 }}>
+        {horse.description && (
+          <section>
+            <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, color: BRAND.black, marginBottom: 10 }}>About {horse.name}</h3>
+            <p style={{ fontSize: 15, lineHeight: 1.8, color: BRAND.grey, whiteSpace: "pre-wrap" }}>{horse.description}</p>
+          </section>
+        )}
+        {horse.experience && (
+          <section>
+            <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, color: BRAND.black, marginBottom: 10 }}>Experience & Training</h3>
+            <p style={{ fontSize: 15, lineHeight: 1.8, color: BRAND.grey, whiteSpace: "pre-wrap" }}>{horse.experience}</p>
+          </section>
+        )}
+        {horse.temperament && (
+          <section>
+            <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, color: BRAND.black, marginBottom: 10 }}>Temperament</h3>
+            <p style={{ fontSize: 15, lineHeight: 1.8, color: BRAND.grey, whiteSpace: "pre-wrap" }}>{horse.temperament}</p>
+          </section>
+        )}
+        {(horse.vaccinations || horse.passport || horse.passport_details || horse.microchipped || horse.health_notes) && (
+          <section>
+            <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, color: BRAND.black, marginBottom: 10 }}>Paperwork & Health</h3>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+              {horse.passport && (
+                <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                  <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
+                  <span><strong style={{ color: BRAND.black }}>Passport:</strong> {horse.passport_details || "Yes"}</span>
+                </li>
+              )}
+              {horse.microchipped && (
+                <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                  <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
+                  <span><strong style={{ color: BRAND.black }}>Microchipped</strong></span>
+                </li>
+              )}
+              {horse.vaccinations && (
+                <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                  <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2713"}</span>
+                  <span><strong style={{ color: BRAND.black }}>Vaccinations:</strong> {horse.vaccinations}</span>
+                </li>
+              )}
+              {horse.health_notes && (
+                <li style={{ display: "flex", gap: 8, fontSize: 14, color: BRAND.grey }}>
+                  <span style={{ color: BRAND.teal, fontWeight: 800 }}>{"\u2022"}</span>
+                  <span style={{ whiteSpace: "pre-wrap" }}>{horse.health_notes}</span>
+                </li>
+              )}
+            </ul>
+          </section>
+        )}
+      </div>
+
+      <style>{`@media(max-width:880px) { [style*="grid-template-columns: 1.2fr 1fr"] { grid-template-columns: 1fr !important; } }`}</style>
+    </div>
+  );
+}
+
+function AdminHorseEditPage({ horse, onSave, onCancel, showToast }) {
+  const [form, setForm] = useState({
+    ...horse,
+    images: horse.images || [],
+    videos: horse.videos || [],
+    disciplines: horse.disciplines || [],
+  });
+  const [uploading, setUploading] = useState(false);
+  const [newVideo, setNewVideo] = useState("");
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleImageUpload = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    const imageFiles = files.filter(isImageFile);
+    if (imageFiles.length === 0) {
+      showToast?.("No image files selected (use JPG, PNG, WebP, etc.)");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      const urls = await uploadImageBatch("horses", imageFiles);
+      setForm(f => ({ ...f, images: [...(f.images || []), ...urls] }));
+      showToast?.(urls.length === 1 ? "Image uploaded" : `${urls.length} images uploaded`);
+    } catch (err) {
+      console.error("Upload error:", err);
+      const msg = err?.message || err?.error_description || "Upload failed";
+      showToast?.(typeof msg === "string" ? msg : "Could not upload horse photos.");
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+
+  const removeImage = (i) => setForm(f => ({ ...f, images: f.images.filter((_, idx) => idx !== i) }));
+  const moveImage = (from, to) => {
+    if (to < 0 || to >= form.images.length) return;
+    setForm(f => {
+      const imgs = [...f.images];
+      const [moved] = imgs.splice(from, 1);
+      imgs.splice(to, 0, moved);
+      return { ...f, images: imgs };
+    });
+  };
+
+  const toggleDiscipline = (d) => setForm(f => {
+    const list = f.disciplines || [];
+    if (list.includes(d)) return { ...f, disciplines: list.filter(x => x !== d) };
+    return { ...f, disciplines: [...list, d] };
+  });
+
+  const addVideo = () => {
+    if (!newVideo.trim()) return;
+    setForm(f => ({ ...f, videos: [...(f.videos || []), newVideo.trim()] }));
+    setNewVideo("");
+  };
+  const removeVideo = (i) => setForm(f => ({ ...f, videos: f.videos.filter((_, idx) => idx !== i) }));
+
+  const submit = () => {
+    if (!form.name?.trim()) { showToast?.("Name is required"); return; }
+    onSave(form);
+  };
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px 80px" }}>
+      <button onClick={onCancel} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back</button>
+      <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800, marginBottom: 32 }}>{form.id ? "Edit Horse" : "New Horse Listing"}</h1>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+        {/* Photos */}
+        <div>
+          <label className="ll-label">Photos</label>
+          <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 10 }}>Upload one or more photos. The first photo is used as the cover.</p>
+          {form.images.length > 0 && (
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
+              {form.images.map((src, i) => (
+                <div key={i} style={{ position: "relative", width: 110, height: 110, borderRadius: 8, overflow: "hidden", border: i === 0 ? `2.5px solid ${BRAND.teal}` : `2px solid ${BRAND.greyLight}`, background: BRAND.offWhite }}>
+                  <img src={src} alt={`Horse ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                  {i === 0 && <div style={{ position: "absolute", top: 4, left: 4, background: BRAND.teal, color: BRAND.white, fontSize: 9, fontWeight: 700, letterSpacing: 1, padding: "2px 6px", borderRadius: 3, textTransform: "uppercase" }}>Cover</div>}
+                  <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, display: "flex", justifyContent: "center", gap: 2, background: "linear-gradient(transparent, rgba(0,0,0,0.7))", padding: "16px 4px 4px" }}>
+                    {i > 0 && <button type="button" onClick={() => moveImage(i, i - 1)} style={{ background: "rgba(255,255,255,0.9)", border: "none", borderRadius: 3, width: 22, height: 22, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{"\u2190"}</button>}
+                    {i < form.images.length - 1 && <button type="button" onClick={() => moveImage(i, i + 1)} style={{ background: "rgba(255,255,255,0.9)", border: "none", borderRadius: 3, width: 22, height: 22, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>{"\u2192"}</button>}
+                    <button type="button" onClick={() => removeImage(i)} style={{ background: "rgba(220,38,38,0.9)", border: "none", borderRadius: 3, width: 22, height: 22, cursor: "pointer", fontSize: 11, color: "#fff" }}>{"\u2715"}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <label style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "24px", border: `2px dashed ${BRAND.greyLight}`, borderRadius: 8, cursor: "pointer", background: uploading ? BRAND.offWhite : BRAND.white, transition: "all 0.2s" }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = BRAND.teal; e.currentTarget.style.background = BRAND.tealLight; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = BRAND.greyLight; e.currentTarget.style.background = BRAND.white; }}>
+            <input type="file" accept="image/*" multiple onChange={handleImageUpload} style={{ display: "none" }} />
+            <div style={{ color: BRAND.teal, marginBottom: 6 }}><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg></div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: BRAND.black }}>{uploading ? "Uploading\u2026" : "Click to upload horse photos"}</div>
+            <div style={{ fontSize: 11, color: BRAND.grey, marginTop: 2 }}>JPG, PNG, WebP {"\u2014"} select multiple</div>
+          </label>
+        </div>
+
+        {/* Core info */}
+        <div>
+          <label className="ll-label">Name *</label>
+          <input className="ll-input" value={form.name || ""} onChange={e => set("name", e.target.value)} placeholder="e.g. Laska" />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label className="ll-label">Breed</label>
+            <input className="ll-input" value={form.breed || ""} onChange={e => set("breed", e.target.value)} placeholder="e.g. Boerperd, Thoroughbred" />
+          </div>
+          <div>
+            <label className="ll-label">Colour</label>
+            <input className="ll-input" value={form.color || ""} onChange={e => set("color", e.target.value)} placeholder="e.g. Bay, Chestnut" />
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+          <div>
+            <label className="ll-label">Sex</label>
+            <select className="ll-input" value={form.sex || ""} onChange={e => set("sex", e.target.value)}>
+              <option value="">Select...</option>
+              {HORSE_SEX_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="ll-label">Age (years)</label>
+            <input className="ll-input" type="number" min="0" step="0.5" value={form.age ?? ""} onChange={e => set("age", e.target.value)} />
+          </div>
+          <div>
+            <label className="ll-label">Height (hh)</label>
+            <input className="ll-input" type="number" min="0" step="0.1" value={form.height_hh ?? ""} onChange={e => set("height_hh", e.target.value)} placeholder="e.g. 15.2" />
+          </div>
+        </div>
+
+        {/* Price */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label className="ll-label">Price (R)</label>
+            <input className="ll-input" type="number" min="0" value={form.price ?? ""} onChange={e => set("price", e.target.value)} placeholder="e.g. 45000" />
+          </div>
+          <div>
+            <label className="ll-label">Price label (optional)</label>
+            <input className="ll-input" value={form.price_label || ""} onChange={e => set("price_label", e.target.value)} placeholder='e.g. "POA" or "Open to offers"' />
+          </div>
+        </div>
+
+        {/* Location */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label className="ll-label">Location / Town</label>
+            <input className="ll-input" value={form.location || ""} onChange={e => set("location", e.target.value)} placeholder="e.g. Stellenbosch" />
+          </div>
+          <div>
+            <label className="ll-label">Province</label>
+            <select className="ll-input" value={form.province || ""} onChange={e => set("province", e.target.value)}>
+              <option value="">Select...</option>
+              {SA_PROVINCES.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Disciplines */}
+        <div>
+          <label className="ll-label">Disciplines</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {HORSE_DISCIPLINES.map(d => {
+              const active = (form.disciplines || []).includes(d);
+              return (
+                <button key={d} type="button" onClick={() => toggleDiscipline(d)} style={{
+                  padding: "8px 14px", borderRadius: 100,
+                  border: active ? `2px solid ${BRAND.teal}` : `1px solid ${BRAND.greyLight}`,
+                  background: active ? BRAND.tealLight : BRAND.white,
+                  color: active ? BRAND.tealDark : BRAND.grey,
+                  fontSize: 12, fontWeight: 700, cursor: "pointer",
+                }}>{d}</button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Rider level */}
+        <div>
+          <label className="ll-label">Suited rider</label>
+          <select className="ll-input" value={form.rider_level || ""} onChange={e => set("rider_level", e.target.value)}>
+            <option value="">Select...</option>
+            {RIDER_LEVELS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+
+        {/* Description */}
+        <div>
+          <label className="ll-label">Description / About</label>
+          <textarea className="ll-input" value={form.description || ""} onChange={e => set("description", e.target.value)} placeholder="Tell the story of this horse — personality, look, what makes them special..." style={{ minHeight: 120 }} />
+        </div>
+
+        {/* Experience */}
+        <div>
+          <label className="ll-label">Experience & Training</label>
+          <textarea className="ll-input" value={form.experience || ""} onChange={e => set("experience", e.target.value)} placeholder="Schooling, competitions, hours of work, handling, manners..." style={{ minHeight: 100 }} />
+        </div>
+
+        {/* Temperament */}
+        <div>
+          <label className="ll-label">Temperament</label>
+          <input className="ll-input" value={form.temperament || ""} onChange={e => set("temperament", e.target.value)} placeholder="e.g. Quiet, willing, brave" />
+        </div>
+
+        {/* Paperwork */}
+        <div style={{ background: BRAND.offWhite, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.grey, marginBottom: 12 }}>Paperwork & Health</div>
+          <div>
+            <label className="ll-label">Vaccinations</label>
+            <input className="ll-input" value={form.vaccinations || ""} onChange={e => set("vaccinations", e.target.value)} placeholder='e.g. "Up to date — AHS, flu, tetanus"' />
+          </div>
+          <div style={{ display: "flex", gap: 16, marginTop: 12, flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!form.passport} onChange={e => set("passport", e.target.checked)} style={{ width: 18, height: 18, accentColor: BRAND.teal }} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Has passport</span>
+            </label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input type="checkbox" checked={!!form.microchipped} onChange={e => set("microchipped", e.target.checked)} style={{ width: 18, height: 18, accentColor: BRAND.teal }} />
+              <span style={{ fontSize: 14, fontWeight: 600 }}>Microchipped</span>
+            </label>
+          </div>
+          {form.passport && (
+            <div style={{ marginTop: 10 }}>
+              <label className="ll-label">Passport details (optional)</label>
+              <input className="ll-input" value={form.passport_details || ""} onChange={e => set("passport_details", e.target.value)} placeholder='e.g. "SAWHS passport, branded"' />
+            </div>
+          )}
+          <div style={{ marginTop: 10 }}>
+            <label className="ll-label">Registration / Studbook (optional)</label>
+            <input className="ll-input" value={form.registration || ""} onChange={e => set("registration", e.target.value)} placeholder='e.g. "Registered SA Boerperd"' />
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <label className="ll-label">Health notes (optional)</label>
+            <textarea className="ll-input" value={form.health_notes || ""} onChange={e => set("health_notes", e.target.value)} placeholder='Soundness, any conditions, history...' style={{ minHeight: 80 }} />
+          </div>
+        </div>
+
+        {/* Videos */}
+        <div>
+          <label className="ll-label">Videos (YouTube or links)</label>
+          {form.videos.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 8 }}>
+              {form.videos.map((url, i) => (
+                <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", background: BRAND.offWhite, borderRadius: 6, fontSize: 13 }}>
+                  <div style={{ flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: BRAND.grey }}>{url}</div>
+                  <button type="button" className="icon-btn" style={{ color: "#dc2626" }} onClick={() => removeVideo(i)}>{Icons.trash}</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <input className="ll-input" value={newVideo} onChange={e => setNewVideo(e.target.value)} placeholder="https://youtube.com/watch?v=..." onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); addVideo(); } }} style={{ flex: 1 }} />
+            <button type="button" className="ll-btn ll-btn-primary ll-btn-sm" onClick={addVideo}>Add</button>
+          </div>
+        </div>
+
+        {/* Contact */}
+        <div style={{ background: BRAND.offWhite, borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.grey, marginBottom: 12 }}>Listing Contact (optional)</div>
+          <p style={{ fontSize: 12, color: BRAND.grey, marginBottom: 10 }}>Leave blank to use the default Laska Legacy contact details.</p>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label className="ll-label">Contact name</label>
+              <input className="ll-input" value={form.contact_name || ""} onChange={e => set("contact_name", e.target.value)} />
+            </div>
+            <div>
+              <label className="ll-label">Phone</label>
+              <input className="ll-input" type="tel" value={form.contact_phone || ""} onChange={e => set("contact_phone", e.target.value)} />
+            </div>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <label className="ll-label">Email</label>
+            <input className="ll-input" type="email" value={form.contact_email || ""} onChange={e => set("contact_email", e.target.value)} />
+          </div>
+        </div>
+
+        {/* Status + featured */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "end" }}>
+          <div>
+            <label className="ll-label">Status</label>
+            <select className="ll-input" value={form.status || "available"} onChange={e => set("status", e.target.value)}>
+              {HORSE_STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", padding: "12px 0" }}>
+            <input type="checkbox" checked={!!form.featured} onChange={e => set("featured", e.target.checked)} style={{ width: 18, height: 18, accentColor: BRAND.teal }} />
+            <span style={{ fontSize: 14, fontWeight: 600 }}>Featured listing</span>
+          </label>
+        </div>
+
+        <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+          <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={submit}>{form.id ? "Update Horse" : "Publish Horse"}</button>
           <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
         </div>
       </div>
