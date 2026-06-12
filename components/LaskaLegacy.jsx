@@ -2564,16 +2564,16 @@ function HorseCard({ horse, onClick }) {
       style={{
         background: BRAND.white, borderRadius: 14, overflow: "hidden", cursor: "pointer",
         border: `1px solid ${BRAND.greyLight}`, transition: "all 0.3s ease",
-        display: "flex", flexDirection: "column",
+        display: "flex", flexDirection: "column", height: "100%",
       }}
       onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 18px 50px rgba(0,0,0,0.12)"; e.currentTarget.style.borderColor = BRAND.teal; }}
       onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; e.currentTarget.style.borderColor = BRAND.greyLight; }}
     >
-      <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", background: BRAND.offWhite }}>
+      <div style={{ position: "relative", width: "100%", aspectRatio: "4/3", flexShrink: 0, overflow: "hidden", background: BRAND.offWhite }}>
         {cover ? (
-          <img src={cover} alt={horse.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", filter: isUnavailable ? "grayscale(0.4) brightness(0.92)" : "none" }} />
+          <img src={cover} alt={horse.name} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", display: "block", filter: isUnavailable ? "grayscale(0.4) brightness(0.92)" : "none" }} />
         ) : (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, opacity: 0.4 }}>{"\uD83D\uDC0E"}</div>
+          <div style={{ position: "absolute", inset: 0, width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 64, opacity: 0.4 }}>{"\uD83D\uDC0E"}</div>
         )}
         <div style={{ position: "absolute", top: 12, left: 12, display: "flex", gap: 6, flexWrap: "wrap" }}>
           {horse.featured && (
