@@ -499,6 +499,7 @@ export default function LaskaLegacy() {
   const [editPost, setEditPost] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [lightbox, setLightbox] = useState(null);
+  const [lightboxList, setLightboxList] = useState(null);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState("home");
   const [filter, setFilter] = useState("all");
@@ -510,6 +511,21 @@ export default function LaskaLegacy() {
   const [adminAuth, setAdminAuth] = useState(false);
   const [customCategories, setCustomCategories] = useState({});
   const [customSubcategories, setCustomSubcategories] = useState({});
+
+  useEffect(() => {
+    if (!lightbox) return;
+    const handleKey = (e) => {
+      if (e.key === "Escape") { setLightbox(null); setLightboxList(null); return; }
+      const list = Array.isArray(lightboxList) ? lightboxList : null;
+      if (!list || list.length < 2) return;
+      const idx = list.findIndex(it => (it.id != null && lightbox.id != null ? it.id === lightbox.id : it.src === lightbox.src));
+      if (idx === -1) return;
+      if (e.key === "ArrowLeft") setLightbox(list[(idx - 1 + list.length) % list.length]);
+      else if (e.key === "ArrowRight") setLightbox(list[(idx + 1) % list.length]);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [lightbox, lightboxList]);
 
   useEffect(() => {
     let cancelled = false;
@@ -784,7 +800,7 @@ export default function LaskaLegacy() {
             </div>
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 28 }} className="desktop-nav">
-            {[["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
+            {[["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["about", "About"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
               <button key={key} className={`nav-link ${page === key || (page === "blog-post" && key === "blog") || (page === "horse-detail" && key === "horses") || (page.startsWith("admin") && key === "admin") ? "active" : ""}`} onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -793,7 +809,7 @@ export default function LaskaLegacy() {
         <style>{`@media(max-width:768px) { .desktop-nav { display:none !important; } .mobile-toggle { display:flex !important; } }`}</style>
         {mobileMenu && (
           <div className="slide-in" style={{ position: "absolute", top: 68, right: 0, background: BRAND.black, padding: "20px 32px", borderRadius: "0 0 0 12px", boxShadow: "0 8px 30px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", gap: 16, zIndex: 99 }}>
-            {[["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
+            {[["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["about", "About"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
               <button key={key} className="nav-link" onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -970,6 +986,117 @@ export default function LaskaLegacy() {
         </div>
       )}
 
+      {/* ABOUT US */}
+      {page === "about" && (
+        <div className="fade-in">
+          {/* Hero */}
+          <section style={{ position: "relative", overflow: "hidden", padding: "100px 24px 90px", textAlign: "center", background: `linear-gradient(135deg, ${BRAND.black} 0%, #0a1620 60%, ${BRAND.tealDark} 100%)` }}>
+            <div style={{ position: "absolute", inset: 0, opacity: 0.10, background: `radial-gradient(ellipse at 25% 35%, ${BRAND.teal}, transparent 60%), radial-gradient(ellipse at 75% 65%, ${BRAND.purple}, transparent 60%)` }} />
+            <div style={{ position: "relative", maxWidth: 760, margin: "0 auto" }} className="fade-up">
+              <img src={LOGO_WHITE} alt="Laska Legacy" style={{ height: 64, marginBottom: 28, filter: "drop-shadow(0 4px 20px rgba(0,151,178,0.3))" }} />
+              <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.teal, marginBottom: 14, fontWeight: 700 }}>About Us</div>
+              <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "clamp(30px, 5.5vw, 52px)", color: BRAND.white, fontWeight: 900, lineHeight: 1.12, marginBottom: 20, letterSpacing: -1 }}>
+                The Story Behind<br /><span style={{ color: BRAND.teal, fontWeight: 700 }}>Laska Legacy</span>
+              </h1>
+              <p style={{ fontSize: 17, color: "rgba(255,255,255,0.7)", lineHeight: 1.7, maxWidth: 560, margin: "0 auto" }}>
+                Born from a lifelong passion for horses, the friendships they create, and the lessons they teach us along the way.
+              </p>
+            </div>
+          </section>
+
+          {/* Laska's story + horse image */}
+          <section style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 24px" }}>
+            <div className="about-split" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "center" }}>
+              <div className="fade-up">
+                <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.purple, marginBottom: 12, fontWeight: 700 }}>The Name</div>
+                <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 30, color: BRAND.black, fontWeight: 800, marginBottom: 20, lineHeight: 1.2 }}>The Horse Who Changed Everything</h2>
+                <p style={{ fontSize: 15.5, lineHeight: 1.9, color: BRAND.grey, marginBottom: 18 }}>
+                  The name <strong style={{ color: BRAND.black }}>Laska</strong> holds a very special place in my heart. It comes from <strong style={{ color: BRAND.black }}>Alaska</strong> — affectionately known as <strong style={{ color: BRAND.black }}>Laska</strong> — a horse who changed my life in ways I could never have imagined.
+                </p>
+                <p style={{ fontSize: 15.5, lineHeight: 1.9, color: BRAND.grey, marginBottom: 18 }}>
+                  I got her in <strong style={{ color: BRAND.black }}>2021</strong>, and tragically lost her in a freak accident in <strong style={{ color: BRAND.black }}>2022</strong>. Though our time together was far too short, she was more than just a horse; she was a teacher, a partner, and a source of inspiration.
+                </p>
+                <p style={{ fontSize: 15.5, lineHeight: 1.9, color: BRAND.grey }}>
+                  The impact she had on my journey continues to shape who I am today, and her legacy lives on through everything this business represents.
+                </p>
+              </div>
+              <div className="fade-up" style={{ position: "relative" }}>
+                <div style={{ position: "absolute", inset: -10, background: `linear-gradient(135deg, ${BRAND.teal}, ${BRAND.purple})`, borderRadius: 18, opacity: 0.18, transform: "rotate(-2deg)" }} />
+                <img src="/about-laska.png" alt="Alaska (Laska), the horse who inspired Laska Legacy" style={{ position: "relative", width: "100%", borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.18)", display: "block" }} />
+                <div style={{ position: "relative", textAlign: "center", marginTop: 16, fontSize: 13, color: BRAND.grey, fontStyle: "italic" }}>Alaska {"\u201C"}Laska{"\u201D"} {"\u00B7"} 2021{"\u2013"}2022 {"\u00B7"} forever remembered</div>
+              </div>
+            </div>
+          </section>
+
+          {/* Why Laska Legacy */}
+          <section style={{ background: BRAND.offWhite, padding: "80px 24px" }}>
+            <div style={{ maxWidth: 800, margin: "0 auto", textAlign: "center" }} className="fade-up">
+              <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.teal, marginBottom: 12, fontWeight: 700 }}>Our Purpose</div>
+              <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 30, color: BRAND.black, fontWeight: 800, marginBottom: 24 }}>More Than a Brand</h2>
+              <p style={{ fontSize: 16, lineHeight: 1.9, color: BRAND.grey, marginBottom: 18 }}>
+                When I started Laska Legacy, my goal was never simply to create another equestrian brand. I wanted to build something that celebrated the connection between horse and rider, preserved the memories we make with our horses, and created a community where people could share their passion for the equestrian lifestyle.
+              </p>
+            </div>
+          </section>
+
+          {/* Friends + group image */}
+          <section style={{ maxWidth: 1100, margin: "0 auto", padding: "80px 24px" }}>
+            <div className="about-split about-split-reverse" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 56, alignItems: "center" }}>
+              <div className="fade-up about-img-col" style={{ position: "relative" }}>
+                <div style={{ position: "absolute", inset: -10, background: `linear-gradient(135deg, ${BRAND.purple}, ${BRAND.teal})`, borderRadius: 18, opacity: 0.18, transform: "rotate(2deg)" }} />
+                <img src="/about-friends.png" alt="The people behind Laska Legacy: Amelie Koekemoer, Sue Marie Colyn and Liani van der Walt" style={{ position: "relative", width: "100%", borderRadius: 14, boxShadow: "0 18px 50px rgba(0,0,0,0.18)", display: "block" }} />
+                <div style={{ position: "relative", textAlign: "center", marginTop: 16, fontSize: 13, color: BRAND.grey, fontStyle: "italic" }}>From left: Amelie Koekemoer, Sue Marie Colyn &amp; Liani van der Walt (Owner)</div>
+              </div>
+              <div className="fade-up about-text-col">
+                <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.purple, marginBottom: 12, fontWeight: 700 }}>The People</div>
+                <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 30, color: BRAND.black, fontWeight: 800, marginBottom: 20, lineHeight: 1.2 }}>The People Behind Laska Legacy</h2>
+                <p style={{ fontSize: 15.5, lineHeight: 1.9, color: BRAND.grey, marginBottom: 18 }}>
+                  This is so much more than just a photo — these are the people behind Laska Legacy, its voice and its brand. From the left: <strong style={{ color: BRAND.black }}>Amelie Koekemoer</strong>, <strong style={{ color: BRAND.black }}>Sue Marie Colyn</strong> and <strong style={{ color: BRAND.black }}>Liani van der Walt</strong> (Owner).
+                </p>
+                <p style={{ fontSize: 15.5, lineHeight: 1.9, color: BRAND.grey, marginBottom: 18 }}>
+                  Without them, Laska Legacy would not exist and it would not be the brand it is today. Their friendship, support, and shared love for horses have been at the very heart of this journey.
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10, margin: "4px 0 22px" }}>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: BRAND.tealLight, color: BRAND.tealDark, fontSize: 12.5, fontWeight: 700, letterSpacing: 0.5, padding: "7px 14px", borderRadius: 999 }}>{"\u2728"} The Dream Team</span>
+                  <span style={{ display: "inline-flex", alignItems: "center", gap: 6, background: BRAND.purpleLight, color: BRAND.purple, fontSize: 12.5, fontWeight: 700, letterSpacing: 0.5, padding: "7px 14px", borderRadius: 999 }}>{"\uD83D\uDC0E"} Triple Trouble</span>
+                </div>
+                <p style={{ fontSize: 15.5, lineHeight: 1.9, color: BRAND.grey, marginBottom: 18 }}>
+                  Around the yard you{"\u2019"}ll hear us answer to two names: the <strong style={{ color: BRAND.black }}>Dream Team</strong> when everything goes to plan, and <strong style={{ color: BRAND.black }}>Triple Trouble</strong> the rest of the time. Put the three of us together and you{"\u2019"}re guaranteed big laughs, a little chaos, and a whole lot of horse hair — usually all at once.
+                </p>
+                <p style={{ fontSize: 15.5, lineHeight: 1.9, color: BRAND.grey }}>
+                  The equestrian world is about so much more than competition or riding; it is about the relationships we build, the experiences we share, and the memories that stay with us long after we leave the arena.
+                </p>
+              </div>
+            </div>
+          </section>
+
+          {/* Closing statement */}
+          <section style={{ position: "relative", overflow: "hidden", padding: "90px 24px", textAlign: "center", background: BRAND.black }}>
+            <div style={{ position: "absolute", inset: 0, opacity: 0.08, background: `radial-gradient(ellipse at 30% 50%, ${BRAND.teal}, transparent 60%), radial-gradient(ellipse at 70% 50%, ${BRAND.purple}, transparent 60%)` }} />
+            <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }} className="fade-up">
+              <img src={LOGO_WHITE} alt="Laska Legacy" style={{ height: 48, marginBottom: 24, opacity: 0.85 }} />
+              <p style={{ fontSize: 17, lineHeight: 1.9, color: "rgba(255,255,255,0.75)", marginBottom: 28 }}>
+                At its heart, Laska Legacy is about honoring those connections. It is about celebrating the horses who shape our lives, the people who stand beside us, and the stories that deserve to be remembered.
+              </p>
+              <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "clamp(22px, 3.5vw, 30px)", color: BRAND.white, fontWeight: 800, lineHeight: 1.4, marginBottom: 36 }}>
+                Every horse leaves a legacy.<br /><span style={{ color: BRAND.teal }}>Every rider has a story.</span>
+              </div>
+              <div style={{ fontSize: 13, letterSpacing: 3, textTransform: "uppercase", color: "rgba(255,255,255,0.5)", marginBottom: 32, fontWeight: 600 }}>Welcome to Laska Legacy</div>
+              <div style={{ display: "flex", gap: 16, justifyContent: "center", flexWrap: "wrap" }}>
+                <button className="ll-btn ll-btn-primary" onClick={() => navigate("shop")}>Explore the Shop</button>
+                <button className="ll-btn ll-btn-outline-white" onClick={() => navigate("contact")}>Get in Touch</button>
+              </div>
+            </div>
+          </section>
+
+          <style>{`@media(max-width:768px) {
+            .about-split { grid-template-columns: 1fr !important; gap: 32px !important; }
+            .about-split-reverse .about-img-col { order: 2; }
+            .about-split-reverse .about-text-col { order: 1; }
+          }`}</style>
+        </div>
+      )}
+
       {/* CONTACT */}
       {page === "contact" && <ContactPage onSubmit={handleContact} />}
 
@@ -982,6 +1109,50 @@ export default function LaskaLegacy() {
             <p style={{ fontSize: 14, color: BRAND.grey, maxWidth: 480, margin: "0 auto" }}>A look at our handcrafted leather goods, paracord work, and canvas bags — from the workbench to the saddle.</p>
           </div>
 
+          {/* Photographer credit */}
+          <div style={{
+            marginBottom: 56, borderRadius: 20, overflow: "hidden",
+            background: `linear-gradient(135deg, ${BRAND.teal} 0%, ${BRAND.purple} 100%)`,
+            boxShadow: "0 18px 40px rgba(94,23,235,0.28)", maxWidth: 780, margin: "0 auto 56px",
+          }}>
+            <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "center", gap: 28, padding: "32px 36px" }}>
+              {/* Logo badge */}
+              <div style={{
+                flex: "0 0 auto", width: 124, height: 124, borderRadius: "50%", background: BRAND.white,
+                display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden",
+                boxShadow: "0 8px 24px rgba(0,0,0,0.25)", border: "3px solid rgba(255,255,255,0.6)",
+              }}>
+                <img src="/written-lens-logo.png" alt="Written Lens Photography" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              </div>
+
+              {/* Text + links */}
+              <div style={{ flex: "1 1 300px", minWidth: 260, textAlign: "left" }}>
+                <div style={{
+                  display: "inline-block", fontSize: 10, letterSpacing: 2, textTransform: "uppercase",
+                  color: BRAND.white, fontWeight: 800, background: "rgba(255,255,255,0.2)",
+                  padding: "5px 12px", borderRadius: 100, marginBottom: 12,
+                }}>{"\u2605"} Proud Laska Legacy Supporter</div>
+                <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.white, fontWeight: 800, margin: "0 0 6px", lineHeight: 1.1, letterSpacing: 0.3 }}>Written Lens Photography</h3>
+                <p style={{ fontSize: 14, color: "rgba(255,255,255,0.9)", margin: "0 0 18px", maxWidth: 440, lineHeight: 1.5 }}>Most of the beautiful photos in this gallery were captured by Written Lens Photography.</p>
+
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <a href="https://wa.me/27823894471" target="_blank" rel="noopener noreferrer" title="WhatsApp +27 82 389 4471" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 100, background: BRAND.white, color: BRAND.purple, fontSize: 13, fontWeight: 800, textDecoration: "none", transition: "transform 0.15s, box-shadow 0.15s" }} onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.2)"; }} onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                    WhatsApp
+                  </a>
+                  <a href="https://www.facebook.com/share/1GPxCwuXKM/" target="_blank" rel="noopener noreferrer" title="Facebook" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 100, background: BRAND.white, color: BRAND.purple, fontSize: 13, fontWeight: 800, textDecoration: "none", transition: "transform 0.15s, box-shadow 0.15s" }} onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.2)"; }} onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                    Facebook
+                  </a>
+                  <a href="https://www.instagram.com/written_lens_photography" target="_blank" rel="noopener noreferrer" title="Instagram" style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "9px 15px", borderRadius: 100, background: BRAND.white, color: BRAND.purple, fontSize: 13, fontWeight: 800, textDecoration: "none", transition: "transform 0.15s, box-shadow 0.15s" }} onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 6px 16px rgba(0,0,0,0.2)"; }} onMouseLeave={e => { e.currentTarget.style.transform = ""; e.currentTarget.style.boxShadow = ""; }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                    Instagram
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {gallery.length === 0 ? (
             <div style={{ textAlign: "center", padding: "64px 24px" }}>
               <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.3 }}>{"\uD83D\uDCF7"}</div>
@@ -989,13 +1160,13 @@ export default function LaskaLegacy() {
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
-              {gallery.map((item, i) => (
+              {[...gallery].reverse().map((item, i, displayed) => (
                 <div key={item.id} className="fade-up" style={{
                   animationDelay: `${i * 0.04}s`, cursor: "pointer", position: "relative",
                   borderRadius: 10, overflow: "hidden", background: BRAND.offWhite,
-                  aspectRatio: i % 5 === 0 ? "1" : i % 3 === 0 ? "4/5" : "1",
+                  aspectRatio: "1",
                 }}
-                  onClick={() => setLightbox(item)}
+                  onClick={() => { setLightboxList(displayed); setLightbox(item); }}
                 >
                   <img src={item.src} alt={item.caption || "Gallery"} style={{
                     width: "100%", height: "100%", objectFit: "cover", display: "block", transition: "transform 0.4s ease",
@@ -1342,19 +1513,49 @@ export default function LaskaLegacy() {
       )}
 
       {/* LIGHTBOX */}
-      {lightbox && (
-        <div onClick={() => setLightbox(null)} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, cursor: "zoom-out", animation: "fadeIn 0.2s ease" }}>
-          <div style={{ position: "relative", maxWidth: 800, maxHeight: "90vh", width: "100%" }} onClick={e => e.stopPropagation()}>
-            <img src={lightbox.src} alt={lightbox.caption || "Gallery"} style={{ width: "100%", maxHeight: "85vh", objectFit: "contain", borderRadius: 8, display: "block" }} />
-            {lightbox.caption && (
-              <div style={{ textAlign: "center", color: "rgba(255,255,255,0.8)", fontSize: 14, fontWeight: 500, marginTop: 12 }}>{lightbox.caption}</div>
+      {lightbox && (() => {
+        const list = Array.isArray(lightboxList) ? lightboxList : null;
+        const idx = list ? list.findIndex(it => (it.id != null && lightbox.id != null ? it.id === lightbox.id : it.src === lightbox.src)) : -1;
+        const hasNav = list && list.length > 1 && idx !== -1;
+        const closeLightbox = () => { setLightbox(null); setLightboxList(null); };
+        const goTo = (delta) => {
+          if (!hasNav) return;
+          const next = (idx + delta + list.length) % list.length;
+          setLightbox(list[next]);
+        };
+        const arrowBtnStyle = {
+          position: "absolute", top: "50%", transform: "translateY(-50%)", width: 44, height: 44,
+          borderRadius: "50%", background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.25)",
+          color: BRAND.white, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 22, lineHeight: 1, transition: "background 0.2s", zIndex: 2,
+        };
+        return (
+          <div onClick={closeLightbox} style={{ position: "fixed", inset: 0, zIndex: 1000, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, cursor: "zoom-out", animation: "fadeIn 0.2s ease" }}>
+            {hasNav && (
+              <button aria-label="Previous photo" onClick={e => { e.stopPropagation(); goTo(-1); }} style={{ ...arrowBtnStyle, left: 16 }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}>
+                {"\u2039"}
+              </button>
             )}
-            <button onClick={() => setLightbox(null)} style={{ position: "absolute", top: -12, right: -12, width: 36, height: 36, borderRadius: "50%", background: BRAND.white, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
-              {Icons.x}
-            </button>
+            <div style={{ position: "relative", maxWidth: 800, maxHeight: "90vh", width: "100%" }} onClick={e => e.stopPropagation()}>
+              <img src={lightbox.src} alt={lightbox.caption || "Gallery"} style={{ width: "100%", maxHeight: "85vh", objectFit: "contain", borderRadius: 8, display: "block" }} />
+              {lightbox.caption && (
+                <div style={{ textAlign: "center", color: "rgba(255,255,255,0.8)", fontSize: 14, fontWeight: 500, marginTop: 12 }}>{lightbox.caption}</div>
+              )}
+              {hasNav && (
+                <div style={{ textAlign: "center", color: "rgba(255,255,255,0.5)", fontSize: 12, fontWeight: 600, marginTop: 8 }}>{idx + 1} / {list.length}</div>
+              )}
+              <button onClick={closeLightbox} style={{ position: "absolute", top: -12, right: -12, width: 36, height: 36, borderRadius: "50%", background: BRAND.white, border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 4px 12px rgba(0,0,0,0.3)" }}>
+                {Icons.x}
+              </button>
+            </div>
+            {hasNav && (
+              <button aria-label="Next photo" onClick={e => { e.stopPropagation(); goTo(1); }} style={{ ...arrowBtnStyle, right: 16 }} onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,0.28)"} onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,0.12)"}>
+                {"\u203A"}
+              </button>
+            )}
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* FOOTER */}
       <footer style={{ background: BRAND.black, color: "rgba(255,255,255,0.5)", padding: "56px 24px", marginTop: 80, textAlign: "center" }}>
@@ -1383,6 +1584,7 @@ export default function LaskaLegacy() {
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("horses")}>Horses</button>
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("gallery")}>Gallery</button>
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("blog")}>Blog</button>
+          <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("about")}>About</button>
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("order")}>Order</button>
           <button style={{ background: "none", border: "none", color: "rgba(255,255,255,0.5)", cursor: "pointer", fontSize: 13 }} onClick={() => navigate("contact")}>Contact</button>
         </div>
