@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import * as db from '@/lib/supabase';
 
 const BRAND = {
@@ -13,9 +13,26 @@ const WHATSAPP_NUMBER = "27725858288";
 const WHATSAPP_DISPLAY = "+27 72 585 8288";
 const EMAIL = "laskalegacypty@gmail.com";
 const INSTAGRAM = "@laska_legacy";
+const CATEGORY_ORDER = ["bridles", "breastplates", "reins", "bags"];
 
 function waLink(text) {
   return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`;
+}
+
+function toKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "other";
+}
+
+function titleCase(value) {
+  return String(value || "")
+    .replace(/[-_]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (m) => m.toUpperCase()) || "Other";
 }
 
 function WhatsAppIcon({ size = 16 }) {
@@ -27,9 +44,23 @@ function WhatsAppIcon({ size = 16 }) {
   );
 }
 
+function ItemImage({ item }) {
+  const [broken, setBroken] = useState(false);
+  if (item.image && !broken) {
+    return <img src={item.image} alt={item.name} onError={() => setBroken(true)} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />;
+  }
+  const initials = (item.name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: `linear-gradient(145deg, #0a0a0a, #1a1a2e)` }}>
+      <span style={{ fontFamily: "'Montserrat', sans-serif", fontWeight: 800, fontSize: 20, color: BRAND.teal, opacity: 0.85, letterSpacing: 2 }}>{initials}</span>
+    </div>
+  );
+}
+
 export default function CatalogPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState("all");
 
   useEffect(() => {
     let cancelled = false;
@@ -43,16 +74,63 @@ export default function CatalogPage() {
     return () => { cancelled = true; };
   }, []);
 
+  const categories = useMemo(() => {
+    const map = new Map();
+    items.forEach((it) => {
+      const key = toKey(it.category);
+      if (!map.has(key)) map.set(key, titleCase(it.category) || "Other");
+    });
+    return [...map.entries()].sort(([a], [b]) => {
+      const ai = CATEGORY_ORDER.indexOf(a);
+      const bi = CATEGORY_ORDER.indexOf(b);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  }, [items]);
+
+  const grouped = useMemo(() => {
+    const filtered = filter === "all" ? items : items.filter((it) => toKey(it.category) === filter);
+    const map = new Map();
+    filtered.forEach((it) => {
+      const key = toKey(it.category);
+      const label = titleCase(it.category) || "Other";
+      if (!map.has(key)) map.set(key, { label, items: [] });
+      map.get(key).items.push(it);
+    });
+    return [...map.entries()].sort(([a], [b]) => {
+      const ai = CATEGORY_ORDER.indexOf(a);
+      const bi = CATEGORY_ORDER.indexOf(b);
+      if (ai !== -1 && bi !== -1) return ai - bi;
+      if (ai !== -1) return -1;
+      if (bi !== -1) return 1;
+      return a.localeCompare(b);
+    });
+  }, [items, filter]);
+
   return (
     <div style={{ minHeight: "100vh", background: BRAND.offWhite, fontFamily: "'Inter', sans-serif", paddingBottom: 60 }}>
-      <div style={{ background: BRAND.black, padding: "36px 20px 28px", textAlign: "center" }}>
-        <img src="/logo-white.png" alt="Laska Legacy" style={{ height: 44, marginBottom: 14 }} />
-        <div style={{ fontSize: 11, letterSpacing: 3, textTransform: "uppercase", color: BRAND.teal, fontWeight: 700 }}>Stall Price List</div>
+      <style>{`
+        @keyframes catFadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .catalog-card { animation: catFadeUp 0.4s ease both; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+        .catalog-card:hover { transform: translateY(-3px); box-shadow: 0 14px 28px rgba(0,0,0,0.1); }
+        .catalog-pill { transition: all 0.2s ease; }
+      `}</style>
+
+      {/* Hero */}
+      <div style={{ position: "relative", overflow: "hidden", background: `linear-gradient(135deg, ${BRAND.black} 0%, #0a1620 60%, ${BRAND.tealDark} 100%)`, padding: "44px 20px 84px", textAlign: "center" }}>
+        <div style={{ position: "absolute", inset: 0, opacity: 0.15, background: `radial-gradient(ellipse at 20% 20%, ${BRAND.teal}, transparent 55%), radial-gradient(ellipse at 80% 60%, ${BRAND.purple}, transparent 55%)` }} />
+        <div style={{ position: "relative" }}>
+          <img src="/logo-white.png" alt="Laska Legacy" style={{ height: 46, marginBottom: 16 }} />
+          <div style={{ fontSize: 11, letterSpacing: 4, textTransform: "uppercase", color: BRAND.teal, fontWeight: 700, marginBottom: 8 }}>At the Stall Today</div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, fontWeight: 800, color: BRAND.white, margin: 0 }}>Price List</h1>
+        </div>
       </div>
 
       {/* Contact card — the one place to reach out */}
-      <div style={{ maxWidth: 900, margin: "-20px auto 0", padding: "0 16px" }}>
-        <div style={{ background: BRAND.white, borderRadius: 14, border: `1px solid ${BRAND.greyLight}`, padding: 20, boxShadow: "0 8px 24px rgba(0,0,0,0.08)" }}>
+      <div style={{ maxWidth: 900, margin: "-48px auto 0", padding: "0 16px", position: "relative", zIndex: 2 }}>
+        <div style={{ background: BRAND.white, borderRadius: 16, padding: 20, boxShadow: "0 20px 40px rgba(0,0,0,0.18)" }}>
           <div style={{ fontSize: 13, color: BRAND.grey, marginBottom: 14, textAlign: "center" }}>
             Like something? Get in touch and we'll sort you out.
           </div>
@@ -60,7 +138,7 @@ export default function CatalogPage() {
             href={waLink("Hi! I'm at your stall and I'd like to order something from the price list.")}
             target="_blank"
             rel="noopener noreferrer"
-            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#25D366", color: "#fff", padding: "14px 20px", borderRadius: 100, fontSize: 15, fontWeight: 700, textDecoration: "none" }}
+            style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: "#25D366", color: "#fff", padding: "14px 20px", borderRadius: 100, fontSize: 15, fontWeight: 700, textDecoration: "none", boxShadow: "0 8px 18px rgba(37,211,102,0.35)" }}
           >
             <WhatsAppIcon size={20} />
             Message Us on WhatsApp
@@ -84,33 +162,78 @@ export default function CatalogPage() {
       )}
 
       {!loading && items.length > 0 && (
-        <div style={{ padding: "28px 16px 4px", maxWidth: 900, margin: "0 auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 12 }}>
-            {items.map((item) => {
-              const soldOut = (item.stock || 0) <= 0;
-              return (
-                <div key={item.id} style={{ display: "flex", gap: 14, background: BRAND.white, borderRadius: 12, padding: 12, border: `1px solid ${BRAND.greyLight}`, alignItems: "center", opacity: soldOut ? 0.55 : 1 }}>
-                  <div style={{ width: 64, height: 64, borderRadius: 8, overflow: "hidden", flexShrink: 0, background: BRAND.offWhite, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {item.image ? (
-                      <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                    ) : (
-                      <span style={{ fontSize: 9, color: BRAND.grey, textAlign: "center" }}>No photo</span>
-                    )}
-                  </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 14.5, color: BRAND.black, lineHeight: 1.3 }}>{item.name}</div>
-                    <div style={{ fontWeight: 800, fontSize: 15, color: BRAND.purple, marginTop: 4 }}>{item.price}</div>
-                  </div>
-                  {soldOut && (
-                    <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: "#dc2626", background: "#fef2f2", padding: "6px 10px", borderRadius: 100 }}>
-                      Sold Out
-                    </span>
-                  )}
-                </div>
-              );
-            })}
+        <>
+          {/* Category pills */}
+          <div style={{ maxWidth: 900, margin: "28px auto 0", padding: "0 16px" }}>
+            <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+              <button
+                className="catalog-pill"
+                onClick={() => setFilter("all")}
+                style={{
+                  flexShrink: 0, padding: "9px 18px", borderRadius: 100, fontSize: 12.5, fontWeight: 700,
+                  border: filter === "all" ? "none" : `1px solid ${BRAND.greyLight}`,
+                  background: filter === "all" ? BRAND.black : BRAND.white,
+                  color: filter === "all" ? BRAND.white : BRAND.black, cursor: "pointer",
+                }}
+              >
+                All
+              </button>
+              {categories.map(([key, label]) => (
+                <button
+                  key={key}
+                  className="catalog-pill"
+                  onClick={() => setFilter(key)}
+                  style={{
+                    flexShrink: 0, padding: "9px 18px", borderRadius: 100, fontSize: 12.5, fontWeight: 700,
+                    border: filter === key ? "none" : `1px solid ${BRAND.greyLight}`,
+                    background: filter === key ? BRAND.teal : BRAND.white,
+                    color: filter === key ? BRAND.white : BRAND.black, cursor: "pointer",
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+
+          {grouped.map(([key, group]) => (
+            <div key={key} style={{ maxWidth: 900, margin: "0 auto", padding: "24px 16px 4px" }}>
+              {filter === "all" && (
+                <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, color: BRAND.black, marginBottom: 14, paddingLeft: 2, display: "flex", alignItems: "center", gap: 10 }}>
+                  {group.label}
+                  <span style={{ height: 1, flex: 1, background: BRAND.greyLight }} />
+                </h2>
+              )}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: 14 }}>
+                {group.items.map((item, i) => {
+                  const soldOut = (item.stock || 0) <= 0;
+                  return (
+                    <div
+                      key={item.id}
+                      className="catalog-card"
+                      style={{ animationDelay: `${i * 0.04}s`, background: BRAND.white, borderRadius: 14, overflow: "hidden", border: `1px solid ${BRAND.greyLight}` }}
+                    >
+                      <div style={{ width: "100%", aspectRatio: "1", position: "relative", background: BRAND.offWhite }}>
+                        <ItemImage item={item} />
+                        {soldOut && (
+                          <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.75)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", color: "#dc2626", background: BRAND.white, padding: "6px 12px", borderRadius: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>
+                              Sold Out
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                      <div style={{ padding: "12px 14px 14px" }}>
+                        <div style={{ fontWeight: 700, fontSize: 13.5, color: BRAND.black, lineHeight: 1.3, marginBottom: 4 }}>{item.name}</div>
+                        <div style={{ fontWeight: 800, fontSize: 15, color: BRAND.purple }}>{item.price}</div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </>
       )}
     </div>
   );

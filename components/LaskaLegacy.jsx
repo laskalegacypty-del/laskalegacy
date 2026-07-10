@@ -1513,32 +1513,41 @@ export default function LaskaLegacy() {
               <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>Stall Price List</h1>
               <p style={{ fontSize: 13, color: BRAND.grey }}>{stallItems.length} item{stallItems.length !== 1 ? "s" : ""} {"·"} {stallItems.reduce((s, i) => s + (i.stock || 0), 0)} in stock {"·"} not shown on the website</p>
             </div>
-            <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-stall-edit", { id: "", name: "", price: "", image: "", stock: 0 })}>{Icons.plus} Add Item</button>
+            <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-stall-edit", { id: "", name: "", price: "", category: "", image: "", stock: 0 })}>{Icons.plus} Add Item</button>
           </div>
           <div style={{ background: BRAND.tealLight, border: `1px solid ${BRAND.teal}`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: BRAND.tealDark, marginBottom: 24 }}>
             <strong>Tip:</strong> This list is separate from your online Shop — it only feeds your <code>/catalog</code> page for customers browsing at your stall. Use the {"−"}/+ buttons to keep stock counts current as you sell.
           </div>
           {stallItems.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No items yet. Add your first one above!</p>}
-          {stallItems.map(item => (
-            <div key={item.id} className="admin-row">
-              <div style={{ width: 48, height: 48, borderRadius: 6, overflow: "hidden", flexShrink: 0, background: BRAND.offWhite }}>
-                {item.image ? (
-                  <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                ) : (
-                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: BRAND.grey }}>No photo</div>
-                )}
-              </div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{item.name}</div>
-                <div style={{ fontSize: 12, color: BRAND.grey }}>{item.price}</div>
-              </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <button className="icon-btn" onClick={() => handleStallStockChange(item.id, (item.stock || 0) - 1)} style={{ width: 28, height: 28, justifyContent: "center", fontSize: 16, fontWeight: 700, border: `1px solid ${BRAND.greyLight}` }}>{"−"}</button>
-                <span style={{ width: 50, textAlign: "center", fontSize: 13, fontWeight: 700, color: (item.stock || 0) === 0 ? "#dc2626" : BRAND.black }}>{item.stock || 0} left</span>
-                <button className="icon-btn" onClick={() => handleStallStockChange(item.id, (item.stock || 0) + 1)} style={{ width: 28, height: 28, justifyContent: "center", fontSize: 16, fontWeight: 700, border: `1px solid ${BRAND.greyLight}` }}>+</button>
-              </div>
-              <button className="icon-btn" onClick={() => navigate("admin-stall-edit", { ...item })}>{Icons.edit}</button>
-              <button className="icon-btn" style={{ color: "#dc2626" }} onClick={() => { if (confirm("Delete " + item.name + "?")) handleDeleteStallItem(item); }}>{Icons.trash}</button>
+          {Object.entries(stallItems.reduce((acc, it) => {
+            const key = titleCaseCategory(it.category) || "Other";
+            (acc[key] = acc[key] || []).push(it);
+            return acc;
+          }, {})).sort(([a], [b]) => a.localeCompare(b)).map(([cat, catItems]) => (
+            <div key={cat} style={{ marginBottom: 28 }}>
+              <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: BRAND.teal, marginBottom: 10 }}>{cat}</h3>
+              {catItems.map(item => (
+                <div key={item.id} className="admin-row">
+                  <div style={{ width: 48, height: 48, borderRadius: 6, overflow: "hidden", flexShrink: 0, background: BRAND.offWhite }}>
+                    {item.image ? (
+                      <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                    ) : (
+                      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: BRAND.grey }}>No photo</div>
+                    )}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{item.name}</div>
+                    <div style={{ fontSize: 12, color: BRAND.grey }}>{item.price}</div>
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                    <button className="icon-btn" onClick={() => handleStallStockChange(item.id, (item.stock || 0) - 1)} style={{ width: 28, height: 28, justifyContent: "center", fontSize: 16, fontWeight: 700, border: `1px solid ${BRAND.greyLight}` }}>{"−"}</button>
+                    <span style={{ width: 50, textAlign: "center", fontSize: 13, fontWeight: 700, color: (item.stock || 0) === 0 ? "#dc2626" : BRAND.black }}>{item.stock || 0} left</span>
+                    <button className="icon-btn" onClick={() => handleStallStockChange(item.id, (item.stock || 0) + 1)} style={{ width: 28, height: 28, justifyContent: "center", fontSize: 16, fontWeight: 700, border: `1px solid ${BRAND.greyLight}` }}>+</button>
+                  </div>
+                  <button className="icon-btn" onClick={() => navigate("admin-stall-edit", { ...item })}>{Icons.edit}</button>
+                  <button className="icon-btn" style={{ color: "#dc2626" }} onClick={() => { if (confirm("Delete " + item.name + "?")) handleDeleteStallItem(item); }}>{Icons.trash}</button>
+                </div>
+              ))}
             </div>
           ))}
         </div>
@@ -1546,7 +1555,7 @@ export default function LaskaLegacy() {
 
       {/* ADMIN STALL PRICE LIST — edit */}
       {page === "admin-stall-edit" && adminAuth && editStallItem && (
-        <AdminStallItemEditPage item={editStallItem} onSave={handleSaveStallItem} onCancel={() => navigate("admin-stall")} showToast={showToast} />
+        <AdminStallItemEditPage item={editStallItem} onSave={handleSaveStallItem} onCancel={() => navigate("admin-stall")} showToast={showToast} existingCategories={[...new Set(stallItems.map(i => titleCaseCategory(i.category)).filter(Boolean))]} />
       )}
 
       {/* ADMIN ORDERS */}
@@ -1926,7 +1935,7 @@ function AdminEditPage({ product, onSave, onCancel, showToast, categories, onCre
   );
 }
 
-function AdminStallItemEditPage({ item, onSave, onCancel, showToast }) {
+function AdminStallItemEditPage({ item, onSave, onCancel, showToast, existingCategories = [] }) {
   const [form, setForm] = useState({ ...item });
   const [uploading, setUploading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -1986,6 +1995,13 @@ function AdminStallItemEditPage({ item, onSave, onCancel, showToast }) {
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
         <div><label className="ll-label">Item Name *</label><input className="ll-input" value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Braided Paracord Reins" /></div>
+        <div>
+          <label className="ll-label">Category</label>
+          <input className="ll-input" list="stall-category-options" value={form.category || ""} onChange={e => set("category", e.target.value)} placeholder="e.g. Bridles, Reins, Bags..." />
+          <datalist id="stall-category-options">
+            {existingCategories.map(c => <option key={c} value={c} />)}
+          </datalist>
+        </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           <div><label className="ll-label">Price *</label><input className="ll-input" value={form.price} onChange={e => set("price", e.target.value)} placeholder="e.g. R450" /></div>
           <div><label className="ll-label">Stock at Stall</label><input className="ll-input" type="number" min="0" value={form.stock} onChange={e => set("stock", Math.max(0, parseInt(e.target.value, 10) || 0))} /></div>
