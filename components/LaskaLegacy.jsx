@@ -1581,7 +1581,7 @@ export default function LaskaLegacy() {
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
                     <button className="icon-btn" onClick={() => handleStallStockChange(item.id, (item.stock || 0) - 1)} style={{ width: 28, height: 28, justifyContent: "center", fontSize: 16, fontWeight: 700, border: `1px solid ${BRAND.greyLight}` }}>{"−"}</button>
-                    <span style={{ width: 50, textAlign: "center", fontSize: 13, fontWeight: 700, color: (item.stock || 0) === 0 ? "#dc2626" : BRAND.black }}>{item.stock || 0} left</span>
+                    <span style={{ width: 50, textAlign: "center", fontSize: 13, fontWeight: 700, color: (item.stock || 0) <= 0 ? "#dc2626" : BRAND.black }}>{Math.max(0, item.stock || 0)} left</span>
                     <button className="icon-btn" onClick={() => handleStallStockChange(item.id, (item.stock || 0) + 1)} style={{ width: 28, height: 28, justifyContent: "center", fontSize: 16, fontWeight: 700, border: `1px solid ${BRAND.greyLight}` }}>+</button>
                   </div>
                   <button className="icon-btn" onClick={() => navigate("admin-stall-edit", { ...item })}>{Icons.edit}</button>
@@ -2139,7 +2139,7 @@ function AdminStallEventsPage({ events, activeEvent, onBack, onNavigateNew, onNa
 
 function AdminStallEventNewPage({ stallItems, onStart, onCancel, showToast }) {
   const [name, setName] = useState("");
-  const [counts, setCounts] = useState(() => Object.fromEntries(stallItems.map(i => [i.id, i.stock || 0])));
+  const [counts, setCounts] = useState(() => Object.fromEntries(stallItems.map(i => [i.id, Math.max(0, i.stock || 0)])));
   const setCount = (id, v) => setCounts(c => ({ ...c, [id]: Math.max(0, v) }));
 
   const grouped = stallItems.reduce((acc, it) => {
@@ -2150,7 +2150,7 @@ function AdminStallEventNewPage({ stallItems, onStart, onCancel, showToast }) {
 
   const handleStart = () => {
     if (!name.trim()) { showToast("Enter an event name"); return; }
-    onStart(name.trim(), stallItems.map(i => ({ stall_item_id: i.id, opening_stock: counts[i.id] ?? (i.stock || 0) })));
+    onStart(name.trim(), stallItems.map(i => ({ stall_item_id: i.id, opening_stock: counts[i.id] ?? Math.max(0, i.stock || 0) })));
   };
 
   return (
@@ -2306,6 +2306,9 @@ function AdminStallEventDetailPage({ event, onBack, onEnd, onUpdateActualCount, 
                   <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 13 }}>{item?.name || "(deleted item)"}</div>
                   <div style={{ fontSize: 11, color: BRAND.grey }}>{new Date(sale.sold_at).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} {"·"} qty {sale.quantity}</div>
                 </div>
+                {sale.reference_code && (
+                  <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, color: BRAND.tealDark, background: BRAND.tealLight, padding: "4px 10px", borderRadius: 100, flexShrink: 0 }}>Ref {sale.reference_code}</div>
+                )}
                 <button className="icon-btn" style={{ color: "#dc2626" }} title="Undo this sale" onClick={() => handleUndo(sale)}>{Icons.trash}</button>
               </div>
             );
