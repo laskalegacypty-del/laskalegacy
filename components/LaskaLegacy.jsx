@@ -496,6 +496,9 @@ export default function LaskaLegacy() {
   const [editHorse, setEditHorse] = useState(null);
   const [stallItems, setStallItems] = useState([]);
   const [editStallItem, setEditStallItem] = useState(null);
+  const [stallEvents, setStallEvents] = useState([]);
+  const [activeStallEvent, setActiveStallEvent] = useState(null);
+  const [selectedStallEvent, setSelectedStallEvent] = useState(null);
   const [adHorse, setAdHorse] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [editPost, setEditPost] = useState(null);
@@ -581,13 +584,15 @@ export default function LaskaLegacy() {
         });
         setCustomCategories(inferredCategories);
         setCustomSubcategories(inferredSubcategories);
-        const [msgs, gal, ords, posts, hrs, stallItms] = await Promise.all([
+        const [msgs, gal, ords, posts, hrs, stallItms, stallEvts, activeEvt] = await Promise.all([
           safeLoad(db.loadMessages, []),
           safeLoad(db.loadGallery, []),
           safeLoad(db.loadOrders, []),
           safeLoad(db.loadBlogPosts, []),
           safeLoad(db.loadHorses, []),
           safeLoad(db.loadStallItems, []),
+          safeLoad(db.loadStallEvents, []),
+          safeLoad(db.getActiveStallEvent, null),
         ]);
         if (cancelled) return;
         setMessages(msgs);
@@ -596,6 +601,8 @@ export default function LaskaLegacy() {
         setBlogPosts(posts);
         setHorses(hrs);
         setStallItems(stallItms);
+        setStallEvents(stallEvts);
+        setActiveStallEvent(activeEvt);
       } catch (err) {
         console.error("Failed to load site data:", err);
       } finally {
@@ -667,6 +674,7 @@ export default function LaskaLegacy() {
       if (p === "horse-detail") setSelectedHorse(data);
       if (p === "admin-horse-edit") setEditHorse(data);
       if (p === "admin-stall-edit") setEditStallItem(data);
+      if (p === "admin-stall-event-detail") setSelectedStallEvent(data);
     }
     window.scrollTo?.({ top: 0 });
   };
@@ -760,6 +768,31 @@ export default function LaskaLegacy() {
     const clamped = Math.max(0, stock);
     setStallItems(stallItems.map(s => s.id === id ? { ...s, stock: clamped } : s));
     await db.updateStallItemStock(id, clamped);
+  };
+  const handleStartStallEvent = async (name, itemsWithOpening) => {
+    if (activeStallEvent) { showToast("An event is already active — end it first"); return; }
+    const newEvent = await db.createStallEvent(name, itemsWithOpening);
+    setStallEvents([newEvent, ...stallEvents]);
+    setActiveStallEvent(newEvent);
+    const openingById = Object.fromEntries(itemsWithOpening.map(i => [i.stall_item_id, i.opening_stock]));
+    setStallItems(stallItems.map(s => openingById[s.id] !== undefined ? { ...s, stock: openingById[s.id] } : s));
+    showToast(`"${name}" started`);
+    navigate("admin-stall-event-detail", newEvent);
+  };
+  const handleEndStallEvent = async (eventId) => {
+    const closed = await db.endStallEvent(eventId);
+    setStallEvents(stallEvents.map(e => e.id === closed.id ? closed : e));
+    setActiveStallEvent(null);
+    setSelectedStallEvent(closed);
+    showToast("Event ended");
+  };
+  const handleUndoStallSale = async (sale) => {
+    const item = await db.undoStallSale(sale.id, sale.stall_item_id, sale.quantity);
+    setStallItems(stallItems.map(s => s.id === item.id ? item : s));
+    return item;
+  };
+  const handleUpdateActualCount = async (eventItemId, count) => {
+    await db.updateStallEventItemActualCount(eventItemId, count);
   };
 
   if (loading) return (
@@ -1350,6 +1383,10 @@ export default function LaskaLegacy() {
                 <span style={{ fontSize: 14, lineHeight: 1 }}>{"\uD83C\uDFF7\uFE0F"}</span>
                 Stall Price List ({stallItems.length})
               </button>
+              <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => navigate("admin-stall-events")}>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>{"\uD83D\uDCCB"}</span>
+                Stall Events {activeStallEvent ? "(Live)" : ""}
+              </button>
               <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-edit", { id: "", name: "", category: "bridles", subcategory: "", price: "", description: "", images: [], featured: false })}>{Icons.plus} Add Product</button>
             </div>
           </div>
@@ -1513,7 +1550,10 @@ export default function LaskaLegacy() {
               <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>Stall Price List</h1>
               <p style={{ fontSize: 13, color: BRAND.grey }}>{stallItems.length} item{stallItems.length !== 1 ? "s" : ""} {"·"} {stallItems.reduce((s, i) => s + (i.stock || 0), 0)} in stock {"·"} not shown on the website</p>
             </div>
-            <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-stall-edit", { id: "", name: "", price: "", category: "", image: "", stock: 0 })}>{Icons.plus} Add Item</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => navigate("admin-stall-labels")}>{"🖨️"} Print Labels</button>
+              <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-stall-edit", { id: "", name: "", price: "", category: "", image: "", stock: 0 })}>{Icons.plus} Add Item</button>
+            </div>
           </div>
           <div style={{ background: BRAND.tealLight, border: `1px solid ${BRAND.teal}`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: BRAND.tealDark, marginBottom: 24 }}>
             <strong>Tip:</strong> This list is separate from your online Shop — it only feeds your <code>/catalog</code> page for customers browsing at your stall. Use the {"−"}/+ buttons to keep stock counts current as you sell.
@@ -1556,6 +1596,45 @@ export default function LaskaLegacy() {
       {/* ADMIN STALL PRICE LIST — edit */}
       {page === "admin-stall-edit" && adminAuth && editStallItem && (
         <AdminStallItemEditPage item={editStallItem} onSave={handleSaveStallItem} onCancel={() => navigate("admin-stall")} showToast={showToast} existingCategories={[...new Set(stallItems.map(i => titleCaseCategory(i.category)).filter(Boolean))]} />
+      )}
+
+      {/* ADMIN STALL LABELS — printable QR sheet */}
+      {page === "admin-stall-labels" && adminAuth && (
+        <AdminStallLabelsPage stallItems={stallItems} onBack={() => navigate("admin-stall")} />
+      )}
+
+      {/* ADMIN STALL EVENTS — list */}
+      {page === "admin-stall-events" && adminAuth && (
+        <AdminStallEventsPage
+          events={stallEvents}
+          activeEvent={activeStallEvent}
+          onBack={() => navigate("admin")}
+          onNavigateNew={() => navigate("admin-stall-event-new")}
+          onNavigateDetail={(ev) => navigate("admin-stall-event-detail", ev)}
+        />
+      )}
+
+      {/* ADMIN STALL EVENTS — new */}
+      {page === "admin-stall-event-new" && adminAuth && (
+        <AdminStallEventNewPage
+          stallItems={stallItems}
+          onCancel={() => navigate("admin-stall-events")}
+          showToast={showToast}
+          onStart={handleStartStallEvent}
+        />
+      )}
+
+      {/* ADMIN STALL EVENTS — detail (live dashboard or closed recon) */}
+      {page === "admin-stall-event-detail" && adminAuth && selectedStallEvent && (
+        <AdminStallEventDetailPage
+          event={selectedStallEvent}
+          stallItems={stallItems}
+          onBack={() => navigate("admin-stall-events")}
+          onEnd={handleEndStallEvent}
+          onUpdateActualCount={handleUpdateActualCount}
+          onUndoSale={handleUndoStallSale}
+          showToast={showToast}
+        />
       )}
 
       {/* ADMIN ORDERS */}
@@ -2011,6 +2090,279 @@ function AdminStallItemEditPage({ item, onSave, onCancel, showToast, existingCat
       <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
         <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.name && form.price) onSave(form); else showToast("Name and price are required"); }}>Save Item</button>
         <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function AdminStallEventsPage({ events, activeEvent, onBack, onNavigateNew, onNavigateDetail }) {
+  const pastEvents = events.filter(e => e.id !== activeEvent?.id);
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—";
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Admin</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>Stall Events</h1>
+          <p style={{ fontSize: 13, color: BRAND.grey }}>Count stock before a show, scan items as they sell, reconcile after.</p>
+        </div>
+        {!activeEvent && (
+          <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={onNavigateNew}>{Icons.plus} Start New Event</button>
+        )}
+      </div>
+
+      {activeEvent && (
+        <div style={{ background: `linear-gradient(135deg, ${BRAND.teal}, ${BRAND.tealDark})`, borderRadius: 14, padding: 24, marginBottom: 32, color: BRAND.white, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, opacity: 0.85, marginBottom: 6 }}>{"● Live Now"}</div>
+            <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 20, fontWeight: 800 }}>{activeEvent.name}</div>
+            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>Started {fmtDate(activeEvent.started_at)}</div>
+          </div>
+          <button className="ll-btn ll-btn-sm" style={{ background: BRAND.white, color: BRAND.tealDark }} onClick={() => onNavigateDetail(activeEvent)}>View Live Dashboard</button>
+        </div>
+      )}
+
+      {pastEvents.length === 0 && !activeEvent && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No events yet. Start one before your next show.</p>}
+      {pastEvents.map(ev => (
+        <div key={ev.id} className="admin-row" style={{ cursor: "pointer" }} onClick={() => onNavigateDetail(ev)}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{ev.name}</div>
+            <div style={{ fontSize: 12, color: BRAND.grey }}>{fmtDate(ev.started_at)}{ev.ended_at ? ` – ${fmtDate(ev.ended_at)}` : ""}</div>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "4px 10px", borderRadius: 100, background: ev.status === "active" ? BRAND.tealLight : BRAND.offWhite, color: ev.status === "active" ? BRAND.tealDark : BRAND.grey }}>{ev.status}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminStallEventNewPage({ stallItems, onStart, onCancel, showToast }) {
+  const [name, setName] = useState("");
+  const [counts, setCounts] = useState(() => Object.fromEntries(stallItems.map(i => [i.id, i.stock || 0])));
+  const setCount = (id, v) => setCounts(c => ({ ...c, [id]: Math.max(0, v) }));
+
+  const grouped = stallItems.reduce((acc, it) => {
+    const key = titleCaseCategory(it.category) || "Other";
+    (acc[key] = acc[key] || []).push(it);
+    return acc;
+  }, {});
+
+  const handleStart = () => {
+    if (!name.trim()) { showToast("Enter an event name"); return; }
+    onStart(name.trim(), stallItems.map(i => ({ stall_item_id: i.id, opening_stock: counts[i.id] ?? (i.stock || 0) })));
+  };
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px 100px" }}>
+      <button onClick={onCancel} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Events</button>
+      <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, color: BRAND.black, fontWeight: 800, marginBottom: 8 }}>Start New Event</h1>
+      <p style={{ fontSize: 13, color: BRAND.grey, marginBottom: 24 }}>Enter the show name, then confirm or adjust how many of each item you're bringing today.</p>
+
+      <div style={{ marginBottom: 28 }}>
+        <label className="ll-label">Event Name *</label>
+        <input className="ll-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. SANESA Show — July 2026" />
+      </div>
+
+      {stallItems.length === 0 && <p style={{ color: BRAND.grey, fontSize: 14 }}>Add items to your Stall Price List first.</p>}
+      {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, items]) => (
+        <div key={cat} style={{ marginBottom: 20 }}>
+          <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 13, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: BRAND.teal, marginBottom: 10 }}>{cat}</h3>
+          {items.map(item => (
+            <div key={item.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: BRAND.white, borderRadius: 8, border: `1px solid ${BRAND.greyLight}`, marginBottom: 8 }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: BRAND.black }}>{item.name}</div>
+                <div style={{ fontSize: 12, color: BRAND.grey }}>{item.price}</div>
+              </div>
+              <input
+                type="number" min="0" className="ll-input"
+                style={{ width: 70, textAlign: "center", padding: "8px 6px" }}
+                value={counts[item.id] ?? 0}
+                onChange={e => setCount(item.id, parseInt(e.target.value, 10) || 0)}
+              />
+            </div>
+          ))}
+        </div>
+      ))}
+
+      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+        <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={handleStart}>Start Event</button>
+        <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function AdminStallEventDetailPage({ event, onBack, onEnd, onUpdateActualCount, onUndoSale, showToast }) {
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [actualCounts, setActualCounts] = useState({});
+
+  const refresh = async () => {
+    setLoading(true);
+    const data = await db.getStallEventSummary(event.id);
+    if (data) {
+      setSummary(data);
+      setActualCounts(Object.fromEntries((data.eventItems || []).map(ei => [ei.id, ei.actual_count ?? ""])));
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => { refresh(); }, [event.id, event.status]);
+
+  if (loading || !summary) return <div style={{ padding: 60, textAlign: "center", color: BRAND.grey }}>Loading event…</div>;
+
+  const soldByItem = {};
+  summary.sales.forEach(s => { soldByItem[s.stall_item_id] = (soldByItem[s.stall_item_id] || 0) + s.quantity; });
+
+  const rows = summary.eventItems.map(ei => {
+    const sold = soldByItem[ei.stall_item_id] || 0;
+    const remaining = Math.max(0, ei.opening_stock - sold);
+    return { ...ei, sold, remaining };
+  });
+
+  const totalSold = rows.reduce((s, r) => s + r.sold, 0);
+  const totalRevenue = rows.reduce((s, r) => s + r.sold * parsePrice(r.stall_items?.price), 0);
+
+  const handleUndo = async (sale) => {
+    await onUndoSale(sale);
+    refresh();
+  };
+
+  const saveActualCount = async (ei) => {
+    const val = actualCounts[ei.id];
+    if (val === "" || val === undefined) return;
+    await onUpdateActualCount(ei.id, parseInt(val, 10) || 0);
+    showToast("Count saved");
+  };
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px 100px" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Events</button>
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8, flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, color: BRAND.black, fontWeight: 800 }}>{event.name}</h1>
+          <p style={{ fontSize: 13, color: BRAND.grey }}>
+            {event.status === "active" ? "🟢 Live" : "Closed"} {"·"} {totalSold} sold {"·"} R{totalRevenue.toFixed(2)} revenue
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="icon-btn" title="Refresh" onClick={refresh} style={{ border: `1px solid ${BRAND.greyLight}` }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+          </button>
+          {event.status === "active" && (
+            <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => { if (confirm(`End "${event.name}"? You'll still be able to review the summary and count actuals afterward.`)) onEnd(event.id); }}>End Event</button>
+          )}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 24 }}>
+        {rows.map(r => (
+          <div key={r.id} className="admin-row" style={{ flexWrap: "wrap" }}>
+            <div style={{ width: 40, height: 40, borderRadius: 6, overflow: "hidden", flexShrink: 0, background: BRAND.offWhite }}>
+              {r.stall_items?.image && <img src={r.stall_items.image} alt={r.stall_items?.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+            </div>
+            <div style={{ flex: 1, minWidth: 120 }}>
+              <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{r.stall_items?.name || "(deleted item)"}</div>
+              <div style={{ fontSize: 12, color: BRAND.grey }}>{r.stall_items?.price}</div>
+            </div>
+            <div style={{ display: "flex", gap: 16, fontSize: 12, color: BRAND.grey, flexShrink: 0 }}>
+              <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: BRAND.black, fontSize: 15 }}>{r.opening_stock}</div>Brought</div>
+              <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: BRAND.purple, fontSize: 15 }}>{r.sold}</div>Sold</div>
+              <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: r.remaining === 0 ? "#dc2626" : BRAND.black, fontSize: 15 }}>{r.remaining}</div>Expected Left</div>
+              {event.status === "closed" && (
+                <div style={{ textAlign: "center" }}>
+                  <input
+                    type="number" min="0" className="ll-input"
+                    style={{ width: 60, padding: "6px 4px", textAlign: "center", fontSize: 13 }}
+                    value={actualCounts[r.id] ?? ""}
+                    onChange={e => setActualCounts(c => ({ ...c, [r.id]: e.target.value }))}
+                    onBlur={() => saveActualCount(r)}
+                  />
+                  <div>Actual</div>
+                </div>
+              )}
+              {event.status === "closed" && actualCounts[r.id] !== "" && actualCounts[r.id] !== undefined && (
+                (() => {
+                  const diff = (parseInt(actualCounts[r.id], 10) || 0) - r.remaining;
+                  return <div style={{ textAlign: "center" }}><div style={{ fontWeight: 800, color: diff === 0 ? "#16a34a" : "#dc2626", fontSize: 15 }}>{diff > 0 ? `+${diff}` : diff}</div>Diff</div>;
+                })()
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {event.status === "active" && (
+        <div style={{ marginTop: 32 }}>
+          <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 16, fontWeight: 800, color: BRAND.black, marginBottom: 12 }}>Recent Sales</h3>
+          {summary.sales.length === 0 && <p style={{ color: BRAND.grey, fontSize: 14 }}>No sales logged yet — scan an item's QR code once it sells.</p>}
+          {summary.sales.slice(0, 20).map(sale => {
+            const item = summary.eventItems.find(ei => ei.stall_item_id === sale.stall_item_id)?.stall_items;
+            return (
+              <div key={sale.id} className="admin-row">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 13 }}>{item?.name || "(deleted item)"}</div>
+                  <div style={{ fontSize: 11, color: BRAND.grey }}>{new Date(sale.sold_at).toLocaleTimeString("en-ZA", { hour: "2-digit", minute: "2-digit" })} {"·"} qty {sale.quantity}</div>
+                </div>
+                <button className="icon-btn" style={{ color: "#dc2626" }} title="Undo this sale" onClick={() => handleUndo(sale)}>{Icons.trash}</button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminStallLabelsPage({ stallItems, onBack }) {
+  const [qrs, setQrs] = useState({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const QRCode = (await import("qrcode")).default;
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://laskalegacy.co.za";
+      const entries = await Promise.all(stallItems.map(async (item) => {
+        const url = `${siteUrl}/stall-scan/${item.id}`;
+        const dataUrl = await QRCode.toDataURL(url, { width: 240, margin: 1 });
+        return [item.id, dataUrl];
+      }));
+      if (!cancelled) setQrs(Object.fromEntries(entries));
+    })();
+    return () => { cancelled = true; };
+  }, [stallItems]);
+
+  return (
+    <div className="stall-labels-print" style={{ maxWidth: 1000, margin: "0 auto", padding: "48px 24px 100px" }}>
+      <style>{`
+        @media print {
+          body * { visibility: hidden; }
+          .stall-labels-print, .stall-labels-print * { visibility: visible; }
+          .stall-labels-print { position: absolute; top: 0; left: 0; width: 100%; padding: 20px !important; margin: 0 !important; }
+          .stall-labels-print .no-print { display: none !important; }
+        }
+        .stall-label-card { break-inside: avoid; }
+      `}</style>
+      <div className="no-print" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
+        <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase" }}>{Icons.back} Back to Price List</button>
+        <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => window.print()}>{"🖨️"} Print</button>
+      </div>
+      <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 24, color: BRAND.black, fontWeight: 800, marginBottom: 8 }}>Stall Item QR Labels</h1>
+      <p className="no-print" style={{ fontSize: 13, color: BRAND.grey, marginBottom: 24 }}>Print and laminate — each code is permanent, so you only need to print these once. Stick one on or near each physical item at the stall.</p>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: 16 }}>
+        {stallItems.map(item => (
+          <div key={item.id} className="stall-label-card" style={{ border: `1px solid ${BRAND.greyLight}`, borderRadius: 10, padding: 14, textAlign: "center" }}>
+            {qrs[item.id] ? (
+              <img src={qrs[item.id]} alt={`QR for ${item.name}`} style={{ width: "100%", maxWidth: 160, margin: "0 auto 8px", display: "block" }} />
+            ) : (
+              <div style={{ width: "100%", aspectRatio: "1", background: BRAND.offWhite, borderRadius: 6, marginBottom: 8 }} />
+            )}
+            <div style={{ fontWeight: 700, fontSize: 13, color: BRAND.black }}>{item.name}</div>
+            <div style={{ fontWeight: 800, fontSize: 13, color: BRAND.purple }}>{item.price}</div>
+          </div>
+        ))}
       </div>
     </div>
   );
