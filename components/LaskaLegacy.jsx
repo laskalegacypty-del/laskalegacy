@@ -494,6 +494,8 @@ export default function LaskaLegacy() {
   const [horses, setHorses] = useState([]);
   const [selectedHorse, setSelectedHorse] = useState(null);
   const [editHorse, setEditHorse] = useState(null);
+  const [stallItems, setStallItems] = useState([]);
+  const [editStallItem, setEditStallItem] = useState(null);
   const [adHorse, setAdHorse] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [editPost, setEditPost] = useState(null);
@@ -579,12 +581,13 @@ export default function LaskaLegacy() {
         });
         setCustomCategories(inferredCategories);
         setCustomSubcategories(inferredSubcategories);
-        const [msgs, gal, ords, posts, hrs] = await Promise.all([
+        const [msgs, gal, ords, posts, hrs, stallItms] = await Promise.all([
           safeLoad(db.loadMessages, []),
           safeLoad(db.loadGallery, []),
           safeLoad(db.loadOrders, []),
           safeLoad(db.loadBlogPosts, []),
           safeLoad(db.loadHorses, []),
+          safeLoad(db.loadStallItems, []),
         ]);
         if (cancelled) return;
         setMessages(msgs);
@@ -592,6 +595,7 @@ export default function LaskaLegacy() {
         setOrders(ords);
         setBlogPosts(posts);
         setHorses(hrs);
+        setStallItems(stallItms);
       } catch (err) {
         console.error("Failed to load site data:", err);
       } finally {
@@ -662,6 +666,7 @@ export default function LaskaLegacy() {
       if (p === "admin-blog-edit") setEditPost(data);
       if (p === "horse-detail") setSelectedHorse(data);
       if (p === "admin-horse-edit") setEditHorse(data);
+      if (p === "admin-stall-edit") setEditStallItem(data);
     }
     window.scrollTo?.({ top: 0 });
   };
@@ -735,6 +740,26 @@ export default function LaskaLegacy() {
     await db.deleteHorse(id);
     setHorses(horses.filter(h => h.id !== id));
     showToast("Horse removed");
+  };
+  const handleSaveStallItem = async (item) => {
+    const saved = await db.saveStallItem(item);
+    if (item.id) {
+      setStallItems(stallItems.map(s => s.id === saved.id ? saved : s));
+    } else {
+      setStallItems([...stallItems, saved]);
+    }
+    showToast("Price list item saved"); navigate("admin-stall");
+  };
+  const handleDeleteStallItem = async (item) => {
+    if (item.image) await deleteImage("stall", item.image);
+    await db.deleteStallItem(item.id);
+    setStallItems(stallItems.filter(s => s.id !== item.id));
+    showToast("Item removed");
+  };
+  const handleStallStockChange = async (id, stock) => {
+    const clamped = Math.max(0, stock);
+    setStallItems(stallItems.map(s => s.id === id ? { ...s, stock: clamped } : s));
+    await db.updateStallItemStock(id, clamped);
   };
 
   if (loading) return (
@@ -1321,6 +1346,10 @@ export default function LaskaLegacy() {
                 <span style={{ fontSize: 14, lineHeight: 1 }}>{"\uD83D\uDC0E"}</span>
                 Horses ({horses.length})
               </button>
+              <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => navigate("admin-stall")}>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>{"\uD83C\uDFF7\uFE0F"}</span>
+                Stall Price List ({stallItems.length})
+              </button>
               <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-edit", { id: "", name: "", category: "bridles", subcategory: "", price: "", description: "", images: [], featured: false })}>{Icons.plus} Add Product</button>
             </div>
           </div>
@@ -1473,6 +1502,51 @@ export default function LaskaLegacy() {
       {/* ADMIN HORSE EDIT */}
       {page === "admin-horse-edit" && adminAuth && editHorse && (
         <AdminHorseEditPage horse={editHorse} onSave={handleSaveHorse} onCancel={() => navigate("admin-horses")} showToast={showToast} />
+      )}
+
+      {/* ADMIN STALL PRICE LIST — list */}
+      {page === "admin-stall" && adminAuth && (
+        <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
+          <button onClick={() => navigate("admin")} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Admin</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 16 }}>
+            <div>
+              <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>Stall Price List</h1>
+              <p style={{ fontSize: 13, color: BRAND.grey }}>{stallItems.length} item{stallItems.length !== 1 ? "s" : ""} {"·"} {stallItems.reduce((s, i) => s + (i.stock || 0), 0)} in stock {"·"} not shown on the website</p>
+            </div>
+            <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-stall-edit", { id: "", name: "", price: "", image: "", stock: 0 })}>{Icons.plus} Add Item</button>
+          </div>
+          <div style={{ background: BRAND.tealLight, border: `1px solid ${BRAND.teal}`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: BRAND.tealDark, marginBottom: 24 }}>
+            <strong>Tip:</strong> This list is separate from your online Shop — it only feeds your <code>/catalog</code> page for customers browsing at your stall. Use the {"−"}/+ buttons to keep stock counts current as you sell.
+          </div>
+          {stallItems.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No items yet. Add your first one above!</p>}
+          {stallItems.map(item => (
+            <div key={item.id} className="admin-row">
+              <div style={{ width: 48, height: 48, borderRadius: 6, overflow: "hidden", flexShrink: 0, background: BRAND.offWhite }}>
+                {item.image ? (
+                  <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                ) : (
+                  <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: BRAND.grey }}>No photo</div>
+                )}
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{item.name}</div>
+                <div style={{ fontSize: 12, color: BRAND.grey }}>{item.price}</div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button className="icon-btn" onClick={() => handleStallStockChange(item.id, (item.stock || 0) - 1)} style={{ width: 28, height: 28, justifyContent: "center", fontSize: 16, fontWeight: 700, border: `1px solid ${BRAND.greyLight}` }}>{"−"}</button>
+                <span style={{ width: 50, textAlign: "center", fontSize: 13, fontWeight: 700, color: (item.stock || 0) === 0 ? "#dc2626" : BRAND.black }}>{item.stock || 0} left</span>
+                <button className="icon-btn" onClick={() => handleStallStockChange(item.id, (item.stock || 0) + 1)} style={{ width: 28, height: 28, justifyContent: "center", fontSize: 16, fontWeight: 700, border: `1px solid ${BRAND.greyLight}` }}>+</button>
+              </div>
+              <button className="icon-btn" onClick={() => navigate("admin-stall-edit", { ...item })}>{Icons.edit}</button>
+              <button className="icon-btn" style={{ color: "#dc2626" }} onClick={() => { if (confirm("Delete " + item.name + "?")) handleDeleteStallItem(item); }}>{Icons.trash}</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ADMIN STALL PRICE LIST — edit */}
+      {page === "admin-stall-edit" && adminAuth && editStallItem && (
+        <AdminStallItemEditPage item={editStallItem} onSave={handleSaveStallItem} onCancel={() => navigate("admin-stall")} showToast={showToast} />
       )}
 
       {/* ADMIN ORDERS */}
@@ -1847,6 +1921,80 @@ function AdminEditPage({ product, onSave, onCancel, showToast, categories, onCre
           <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.name && form.price) onSave(form); }}>Save Product</button>
           <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminStallItemEditPage({ item, onSave, onCancel, showToast }) {
+  const [form, setForm] = useState({ ...item });
+  const [uploading, setUploading] = useState(false);
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handlePhoto = async (e) => {
+    const file = (e.target.files || [])[0];
+    if (!file) return;
+    if (!isImageFile(file)) {
+      showToast("Please choose a photo (JPG, PNG, WebP, etc.)");
+      e.target.value = "";
+      return;
+    }
+    setUploading(true);
+    try {
+      if (form.image) await deleteImage("stall", form.image);
+      const [url] = await uploadImageBatch("stall", [file]);
+      set("image", url);
+    } catch (err) {
+      console.error(err);
+      showToast(err?.message || "Photo upload failed");
+    }
+    setUploading(false);
+    e.target.value = "";
+  };
+
+  const removePhoto = async () => {
+    if (form.image) await deleteImage("stall", form.image);
+    set("image", "");
+  };
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 560, margin: "0 auto", padding: "48px 24px" }}>
+      <button onClick={onCancel} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Price List</button>
+      <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, color: BRAND.black, fontWeight: 800, marginBottom: 24 }}>{item.id ? "Edit Item" : "Add Item"}</h1>
+
+      <div style={{ marginBottom: 20 }}>
+        <label className="ll-label" style={{ marginBottom: 8, display: "block" }}>Photo</label>
+        {form.image ? (
+          <div style={{ position: "relative", width: 160, height: 160, borderRadius: 10, overflow: "hidden", background: BRAND.offWhite }}>
+            <img src={form.image} alt={form.name} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            <button className="icon-btn" onClick={removePhoto} style={{ position: "absolute", top: 6, right: 6, background: "rgba(255,255,255,0.9)" }}>{Icons.trash}</button>
+          </div>
+        ) : (
+          <label style={{
+            display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+            width: 160, height: 160, border: `2px dashed ${BRAND.greyLight}`, borderRadius: 10, cursor: "pointer",
+            background: uploading ? BRAND.offWhite : BRAND.white, textAlign: "center", padding: 12,
+          }}>
+            <input type="file" accept="image/*" capture="environment" onChange={handlePhoto} style={{ display: "none" }} />
+            <div style={{ color: BRAND.teal, marginBottom: 6 }}>
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.black }}>{uploading ? "Uploading…" : "Take or upload a photo"}</div>
+          </label>
+        )}
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div><label className="ll-label">Item Name *</label><input className="ll-input" value={form.name} onChange={e => set("name", e.target.value)} placeholder="e.g. Braided Paracord Reins" /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div><label className="ll-label">Price *</label><input className="ll-input" value={form.price} onChange={e => set("price", e.target.value)} placeholder="e.g. R450" /></div>
+          <div><label className="ll-label">Stock at Stall</label><input className="ll-input" type="number" min="0" value={form.stock} onChange={e => set("stock", Math.max(0, parseInt(e.target.value, 10) || 0))} /></div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+        <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.name && form.price) onSave(form); else showToast("Name and price are required"); }}>Save Item</button>
+        <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
       </div>
     </div>
   );
