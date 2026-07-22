@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import * as db from "@/lib/supabase";
 import { uploadImage, deleteImage, isImageFile } from "@/lib/supabase";
 
@@ -294,6 +294,7 @@ function formatPrice(n) { return "R" + n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d)
 const ANATOMIC_SHIRT_SIZES = ["XS", "S", "M", "L", "XL", "XXL"];
 
 function isAnatomicShirt(product) {
+  if (product?.isSaleItem) return false;
   const name = String(product?.name || "").toLowerCase();
   const sub = String(product?.subcategory || "").toLowerCase().replace(/_/g, "-");
   if (sub.includes("western-shirt") || sub.includes("button-shirt")) return true;
@@ -321,6 +322,25 @@ function getProductStyles(product) {
 
 function productNeedsOrderOptions(product) {
   return isAnatomicShirt(product);
+}
+
+// Normalizes a stall item + a sale's % discount into an object OrderFormPage
+// can select/checkout the same as a regular product.
+function toSaleProduct(stallItem, discountPercent) {
+  const original = parsePrice(stallItem.price);
+  const discounted = Math.round(Math.max(0, original - (original * discountPercent / 100)));
+  return {
+    id: `sale-${stallItem.id}`,
+    isSaleItem: true,
+    stallItemId: stallItem.id,
+    name: stallItem.name,
+    category: stallItem.category || "other",
+    images: stallItem.image ? [stallItem.image] : [],
+    price: formatPrice(discounted).replace(/\.00$/, ""),
+    originalPrice: stallItem.price,
+    discountPercent,
+    stock: Math.max(0, stallItem.stock ?? 0),
+  };
 }
 
 function formatOrderItemLabel(item) {
@@ -499,6 +519,10 @@ export default function LaskaLegacy() {
   const [stallEvents, setStallEvents] = useState([]);
   const [activeStallEvent, setActiveStallEvent] = useState(null);
   const [selectedStallEvent, setSelectedStallEvent] = useState(null);
+  const [sales, setSales] = useState([]);
+  const [activeSale, setActiveSale] = useState(null);
+  const [editSale, setEditSale] = useState(null);
+  const [preselectSaleItemId, setPreselectSaleItemId] = useState(null);
   const [adHorse, setAdHorse] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [editPost, setEditPost] = useState(null);
@@ -584,7 +608,7 @@ export default function LaskaLegacy() {
         });
         setCustomCategories(inferredCategories);
         setCustomSubcategories(inferredSubcategories);
-        const [msgs, gal, ords, posts, hrs, stallItms, stallEvts, activeEvt] = await Promise.all([
+        const [msgs, gal, ords, posts, hrs, stallItms, stallEvts, activeEvt, salesList, activeSaleData] = await Promise.all([
           safeLoad(db.loadMessages, []),
           safeLoad(db.loadGallery, []),
           safeLoad(db.loadOrders, []),
@@ -593,6 +617,8 @@ export default function LaskaLegacy() {
           safeLoad(db.loadStallItems, []),
           safeLoad(db.loadStallEvents, []),
           safeLoad(db.getActiveStallEvent, null),
+          safeLoad(db.loadSales, []),
+          safeLoad(db.getActiveSale, null),
         ]);
         if (cancelled) return;
         setMessages(msgs);
@@ -603,6 +629,8 @@ export default function LaskaLegacy() {
         setStallItems(stallItms);
         setStallEvents(stallEvts);
         setActiveStallEvent(activeEvt);
+        setSales(salesList);
+        setActiveSale(activeSaleData);
       } catch (err) {
         console.error("Failed to load site data:", err);
       } finally {
@@ -675,6 +703,8 @@ export default function LaskaLegacy() {
       if (p === "admin-horse-edit") setEditHorse(data);
       if (p === "admin-stall-edit") setEditStallItem(data);
       if (p === "admin-stall-event-detail") setSelectedStallEvent(data);
+      if (p === "admin-sale-edit") setEditSale(data);
+      if (p === "order") setPreselectSaleItemId(data || null);
     }
     window.scrollTo?.({ top: 0 });
   };
@@ -709,6 +739,7 @@ export default function LaskaLegacy() {
   const handleSubmitOrder = async (order) => {
     const saved = await db.createOrder(order);
     setOrders([saved, ...orders]);
+    await handleSubmitOrderStockAdjust(order.items, -1);
     showToast("Order submitted! We'll be in touch."); navigate("home");
   };
   const handleUpdateOrder = async (updated) => {
@@ -717,6 +748,8 @@ export default function LaskaLegacy() {
     showToast("Order updated");
   };
   const handleDeleteOrder = async (id) => {
+    const order = orders.find(o => o.id === id);
+    if (order) await handleSubmitOrderStockAdjust(order.items || [], 1);
     await db.deleteOrder(id);
     setOrders(orders.filter(o => o.id !== id));
     showToast("Order deleted");
@@ -794,6 +827,44 @@ export default function LaskaLegacy() {
   const handleUpdateActualCount = async (eventItemId, count) => {
     await db.updateStallEventItemActualCount(eventItemId, count);
   };
+  const handleCreateSale = async (name, discountPercent, stallItemIds) => {
+    if (activeSale) { showToast("A sale is already active — end it first"); return; }
+    const saved = await db.createSale(name, discountPercent, stallItemIds);
+    setSales([saved, ...sales]);
+    setActiveSale(saved);
+    showToast("Sale started"); navigate("admin-sale");
+  };
+  const handleUpdateSale = async (saleId, name, discountPercent, stallItemIds) => {
+    const saved = await db.updateSale(saleId, name, discountPercent, stallItemIds);
+    setSales(sales.map(s => s.id === saved.id ? saved : s));
+    setActiveSale(saved);
+    showToast("Sale updated"); navigate("admin-sale");
+  };
+  const handleEndSale = async (id) => {
+    await db.endSale(id);
+    setSales(await db.loadSales());
+    setActiveSale(null);
+    showToast("Sale ended");
+  };
+  const handleSubmitOrderStockAdjust = async (items, sign) => {
+    for (const it of items) {
+      if (typeof it.productId !== "string" || !it.productId.startsWith("sale-")) continue;
+      const stallItemId = it.productId.slice("sale-".length);
+      try {
+        const updated = await db.adjustStallItemStock(stallItemId, sign * it.qty);
+        setStallItems(prev => prev.map(s => s.id === updated.id ? updated : s));
+      } catch (err) {
+        console.error("Failed to adjust stall stock for order item:", err);
+      }
+    }
+  };
+
+  const navLinks = [
+    ["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["about", "About"],
+    ["gallery", "Gallery"], ["blog", "Blog"],
+    ...(activeSale ? [["sale", "Sale"]] : []),
+    ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"],
+  ];
 
   if (loading) return (
     <GallopLoader />
@@ -858,7 +929,7 @@ export default function LaskaLegacy() {
             </div>
           </button>
           <div style={{ display: "flex", alignItems: "center", gap: 28 }} className="desktop-nav">
-            {[["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["about", "About"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
+            {navLinks.map(([key, label]) => (
               <button key={key} className={`nav-link ${page === key || (page === "blog-post" && key === "blog") || (page === "horse-detail" && key === "horses") || (page.startsWith("admin") && key === "admin") ? "active" : ""}`} onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -867,7 +938,7 @@ export default function LaskaLegacy() {
         <style>{`@media(max-width:768px) { .desktop-nav { display:none !important; } .mobile-toggle { display:flex !important; } }`}</style>
         {mobileMenu && (
           <div className="slide-in" style={{ position: "absolute", top: 68, right: 0, background: BRAND.black, padding: "20px 32px", borderRadius: "0 0 0 12px", boxShadow: "0 8px 30px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column", gap: 16, zIndex: 99 }}>
-            {[["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["about", "About"], ["gallery", "Gallery"], ["blog", "Blog"], ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"]].map(([key, label]) => (
+            {navLinks.map(([key, label]) => (
               <button key={key} className="nav-link" onClick={() => navigate(key)}>{label}</button>
             ))}
           </div>
@@ -893,6 +964,33 @@ export default function LaskaLegacy() {
               </div>
             </div>
           </section>
+
+          {activeSale && (
+            <section
+              onClick={() => navigate("sale")}
+              style={{
+                position: "relative", overflow: "hidden", cursor: "pointer",
+                background: `linear-gradient(115deg, ${BRAND.purple} 0%, ${BRAND.teal} 100%)`,
+                padding: "36px 24px", textAlign: "center",
+              }}
+            >
+              <div style={{ position: "absolute", inset: 0, opacity: 0.15, background: "repeating-linear-gradient(-45deg, rgba(255,255,255,0.5) 0 2px, transparent 2px 26px)" }} />
+              <div style={{ position: "relative", maxWidth: 700, margin: "0 auto" }}>
+                <div style={{ display: "inline-block", background: BRAND.white, color: BRAND.purple, fontFamily: "'Montserrat', sans-serif", fontWeight: 900, fontSize: 15, letterSpacing: 1, padding: "6px 18px", borderRadius: 100, marginBottom: 14, transform: "rotate(-2deg)", boxShadow: "0 6px 16px rgba(0,0,0,0.2)" }}>
+                  🔥 {activeSale.discount_percent}% OFF
+                </div>
+                <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "clamp(22px, 4vw, 34px)", color: BRAND.white, fontWeight: 900, marginBottom: 10, letterSpacing: -0.5 }}>
+                  {activeSale.name}
+                </h2>
+                <button className="ll-btn" style={{ background: BRAND.white, color: BRAND.purple, marginBottom: 14 }} onClick={(e) => { e.stopPropagation(); navigate("sale"); }}>
+                  Shop the Sale
+                </button>
+                <p style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>
+                  Only applicable to current stock on hand. While stocks last.
+                </p>
+              </div>
+            </section>
+          )}
 
           <section style={{ maxWidth: 1200, margin: "0 auto", padding: "72px 24px" }}>
             <div style={{ textAlign: "center", marginBottom: 48 }}>
@@ -1247,7 +1345,18 @@ export default function LaskaLegacy() {
 
       {/* PUBLIC ORDER FORM */}
       {page === "order" && (
-        <OrderFormPage products={products} onSubmit={handleSubmitOrder} />
+        <OrderFormPage
+          products={products}
+          saleProducts={activeSale ? activeSale.sale_items.map(si => toSaleProduct(si.stall_items, activeSale.discount_percent)) : []}
+          preselectSaleItemId={preselectSaleItemId}
+          onPreselectHandled={() => setPreselectSaleItemId(null)}
+          onSubmit={handleSubmitOrder}
+        />
+      )}
+
+      {/* PUBLIC SALE PAGE */}
+      {page === "sale" && (
+        <SalePage sale={activeSale} onBuyNow={(stallItemId) => navigate("order", stallItemId)} />
       )}
 
       {/* BLOG LISTING */}
@@ -1386,6 +1495,10 @@ export default function LaskaLegacy() {
               <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => navigate("admin-stall-events")}>
                 <span style={{ fontSize: 14, lineHeight: 1 }}>{"\uD83D\uDCCB"}</span>
                 Stall Events {activeStallEvent ? "(Live)" : ""}
+              </button>
+              <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => navigate("admin-sale")}>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>{"\uD83D\uDD25"}</span>
+                Sale {activeSale ? "(Live)" : ""}
               </button>
               <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-edit", { id: "", name: "", category: "bridles", subcategory: "", price: "", description: "", images: [], featured: false })}>{Icons.plus} Add Product</button>
             </div>
@@ -1634,6 +1747,40 @@ export default function LaskaLegacy() {
           onUpdateActualCount={handleUpdateActualCount}
           onUndoSale={handleUndoStallSale}
           showToast={showToast}
+        />
+      )}
+
+      {/* ADMIN SALE — list/dashboard */}
+      {page === "admin-sale" && adminAuth && (
+        <AdminSalePage
+          sale={activeSale}
+          sales={sales}
+          onBack={() => navigate("admin")}
+          onNavigateNew={() => navigate("admin-sale-new")}
+          onNavigateEdit={(s) => navigate("admin-sale-edit", s)}
+          onEnd={handleEndSale}
+        />
+      )}
+
+      {/* ADMIN SALE — new */}
+      {page === "admin-sale-new" && adminAuth && (
+        <AdminSaleFormPage
+          sale={null}
+          stallItems={stallItems}
+          onCancel={() => navigate("admin-sale")}
+          showToast={showToast}
+          onSave={({ name, discountPercent, stallItemIds }) => handleCreateSale(name, discountPercent, stallItemIds)}
+        />
+      )}
+
+      {/* ADMIN SALE — edit */}
+      {page === "admin-sale-edit" && adminAuth && editSale && (
+        <AdminSaleFormPage
+          sale={editSale}
+          stallItems={stallItems}
+          onCancel={() => navigate("admin-sale")}
+          showToast={showToast}
+          onSave={({ id, name, discountPercent, stallItemIds }) => handleUpdateSale(id, name, discountPercent, stallItemIds)}
         />
       )}
 
@@ -2319,6 +2466,118 @@ function AdminStallEventDetailPage({ event, onBack, onEnd, onUpdateActualCount, 
   );
 }
 
+function AdminSalePage({ sale, sales, onBack, onNavigateNew, onNavigateEdit, onEnd }) {
+  const pastSales = sales.filter(s => s.id !== sale?.id);
+  const fmtDate = (d) => d ? new Date(d).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Admin</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24, flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>Sale</h1>
+          <p style={{ fontSize: 13, color: BRAND.grey }}>A site-wide % discount on chosen Stall Price List items.</p>
+        </div>
+        {!sale && (
+          <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={onNavigateNew}>{Icons.plus} Start New Sale</button>
+        )}
+      </div>
+
+      {sale && (
+        <div style={{ background: `linear-gradient(115deg, ${BRAND.purple}, ${BRAND.teal})`, borderRadius: 14, padding: 24, marginBottom: 32, color: BRAND.white, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div>
+            <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, opacity: 0.85, marginBottom: 6 }}>{"🔥 Live Now"}</div>
+            <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 20, fontWeight: 800 }}>{sale.name} — {sale.discount_percent}% off</div>
+            <div style={{ fontSize: 12, opacity: 0.85, marginTop: 4 }}>{sale.sale_items?.length || 0} item{sale.sale_items?.length !== 1 ? "s" : ""} {"·"} started {fmtDate(sale.started_at)}</div>
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="ll-btn ll-btn-sm" style={{ background: "rgba(255,255,255,0.2)", color: BRAND.white }} onClick={() => onNavigateEdit(sale)}>Edit</button>
+            <button className="ll-btn ll-btn-sm" style={{ background: BRAND.white, color: BRAND.purple }} onClick={() => { if (confirm(`End the "${sale.name}" sale?`)) onEnd(sale.id); }}>End Sale</button>
+          </div>
+        </div>
+      )}
+
+      {!sale && pastSales.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No sales yet. Start one to show a banner on your homepage and a dedicated sale page.</p>}
+      {pastSales.map(s => (
+        <div key={s.id} className="admin-row">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{s.name} — {s.discount_percent}% off</div>
+            <div style={{ fontSize: 12, color: BRAND.grey }}>{fmtDate(s.started_at)}{s.ended_at ? ` – ${fmtDate(s.ended_at)}` : ""} {"·"} {s.sale_items?.length || 0} item{s.sale_items?.length !== 1 ? "s" : ""}</div>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", padding: "4px 10px", borderRadius: 100, background: BRAND.offWhite, color: BRAND.grey }}>{s.status}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AdminSaleFormPage({ sale, stallItems, onCancel, showToast, onSave }) {
+  const [name, setName] = useState(sale?.name || "");
+  const [discountPercent, setDiscountPercent] = useState(sale?.discount_percent ?? 20);
+  const [selected, setSelected] = useState(() => new Set((sale?.sale_items || []).map(si => si.stall_item_id)));
+
+  const toggle = (id) => setSelected(prev => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+
+  const grouped = stallItems.reduce((acc, it) => {
+    const key = titleCaseCategory(it.category) || "Other";
+    (acc[key] = acc[key] || []).push(it);
+    return acc;
+  }, {});
+
+  const handleSave = () => {
+    if (!name.trim()) { showToast("Enter a sale name"); return; }
+    if (selected.size === 0) { showToast("Pick at least one item"); return; }
+    onSave({ id: sale?.id, name: name.trim(), discountPercent: Number(discountPercent) || 0, stallItemIds: [...selected] });
+  };
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 640, margin: "0 auto", padding: "48px 24px 100px" }}>
+      <button onClick={onCancel} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Sale</button>
+      <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, color: BRAND.black, fontWeight: 800, marginBottom: 8 }}>{sale ? "Edit Sale" : "Start New Sale"}</h1>
+      <p style={{ fontSize: 13, color: BRAND.grey, marginBottom: 24 }}>Name it, set the discount, and pick which items are included. Stock shown is a live guide only.</p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12, marginBottom: 28 }}>
+        <div>
+          <label className="ll-label">Sale Name *</label>
+          <input className="ll-input" value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Winter Clearance" />
+        </div>
+        <div>
+          <label className="ll-label">Discount %</label>
+          <input className="ll-input" type="number" min="0" max="100" value={discountPercent} onChange={e => setDiscountPercent(e.target.value)} />
+        </div>
+      </div>
+
+      {stallItems.length === 0 && <p style={{ color: BRAND.grey, fontSize: 14 }}>Add items to your Stall Price List first.</p>}
+      {Object.entries(grouped).sort(([a], [b]) => a.localeCompare(b)).map(([cat, catItems]) => (
+        <div key={cat} style={{ marginBottom: 20 }}>
+          <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 13, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: BRAND.purple, marginBottom: 10 }}>{cat}</h3>
+          {catItems.map(item => {
+            const checked = selected.has(item.id);
+            return (
+              <label key={item.id} style={{ display: "flex", alignItems: "center", gap: 14, padding: "10px 14px", background: checked ? BRAND.purpleLight : BRAND.white, borderRadius: 8, border: `1px solid ${checked ? BRAND.purple : BRAND.greyLight}`, marginBottom: 8, cursor: "pointer" }}>
+                <input type="checkbox" checked={checked} onChange={() => toggle(item.id)} style={{ width: 18, height: 18, accentColor: BRAND.purple }} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: BRAND.black }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: BRAND.grey }}>{item.price} {"·"} Stock: {Math.max(0, item.stock ?? 0)}</div>
+                </div>
+              </label>
+            );
+          })}
+        </div>
+      ))}
+
+      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+        <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={handleSave}>Save Sale</button>
+        <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
 function AdminStallLabelsPage({ stallItems, onBack }) {
   const [qrs, setQrs] = useState({});
 
@@ -2502,21 +2761,119 @@ function AdminGalleryPage({ gallery, setGallery, onBack, showToast }) {
   );
 }
 
+// ─── Public Sale Page ───
+function SalePage({ sale, onBuyNow }) {
+  if (!sale) {
+    return (
+      <div className="fade-in" style={{ maxWidth: 600, margin: "0 auto", padding: "80px 24px", textAlign: "center" }}>
+        <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, color: BRAND.black, fontWeight: 800, marginBottom: 12 }}>No Sale Running Right Now</h1>
+        <p style={{ fontSize: 14, color: BRAND.grey }}>Check back soon — we run these often!</p>
+      </div>
+    );
+  }
+
+  const items = (sale.sale_items || []).map(si => toSaleProduct(si.stall_items, sale.discount_percent));
+
+  return (
+    <div className="fade-in">
+      <section style={{ position: "relative", overflow: "hidden", padding: "80px 24px 60px", textAlign: "center", background: `linear-gradient(125deg, ${BRAND.black} 0%, ${BRAND.purple} 55%, ${BRAND.teal} 100%)` }}>
+        <div style={{ position: "absolute", inset: 0, opacity: 0.18, background: "repeating-linear-gradient(-45deg, rgba(255,255,255,0.6) 0 2px, transparent 2px 30px)" }} />
+        <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }}>
+          <div style={{ display: "inline-block", background: BRAND.white, color: BRAND.purple, fontFamily: "'Montserrat', sans-serif", fontWeight: 900, fontSize: "clamp(22px, 5vw, 36px)", padding: "10px 28px", borderRadius: 100, marginBottom: 20, transform: "rotate(-2deg)", boxShadow: "0 10px 26px rgba(0,0,0,0.3)" }}>
+            🔥 {sale.discount_percent}% OFF
+          </div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "clamp(26px, 5vw, 44px)", color: BRAND.white, fontWeight: 900, marginBottom: 16, letterSpacing: -0.5 }}>
+            {sale.name}
+          </h1>
+          <p style={{ fontSize: 15, color: "rgba(255,255,255,0.9)", fontWeight: 700, maxWidth: 460, margin: "0 auto" }}>
+            Only applicable to current stock on hand. While stocks last!
+          </p>
+        </div>
+      </section>
+
+      <div style={{ maxWidth: 1200, margin: "0 auto", padding: "48px 24px" }}>
+        {items.length === 0 && <p style={{ textAlign: "center", color: BRAND.grey, padding: 48 }}>No items in this sale yet.</p>}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 24 }}>
+          {items.map((p) => {
+            const soldOut = p.stock <= 0;
+            const lowStock = !soldOut && p.stock <= 3;
+            return (
+              <div key={p.id} className="product-card" style={{ opacity: soldOut ? 0.6 : 1 }}>
+                <div style={{ position: "relative" }}>
+                  <ProductImage name={p.name} category={p.category} images={p.images} />
+                  <span style={{ position: "absolute", top: 12, left: 12, fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", background: BRAND.purple, color: BRAND.white, padding: "5px 10px", borderRadius: 100 }}>
+                    -{p.discountPercent}% OFF
+                  </span>
+                  {soldOut && (
+                    <div style={{ position: "absolute", inset: 0, background: "rgba(255,255,255,0.75)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1.5, textTransform: "uppercase", color: "#dc2626", background: BRAND.white, padding: "6px 12px", borderRadius: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>Sold Out</span>
+                    </div>
+                  )}
+                </div>
+                <div style={{ padding: "20px 20px 24px" }}>
+                  <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 6, fontWeight: 700 }}>{titleCaseCategory(p.category)}</div>
+                  <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 17, color: BRAND.black, fontWeight: 700, marginBottom: 8 }}>{p.name}</h3>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 4 }}>
+                    <span style={{ fontSize: 14, color: BRAND.grey, textDecoration: "line-through" }}>{p.originalPrice}</span>
+                    <span style={{ fontSize: 20, fontWeight: 800, color: BRAND.purple }}>{p.price}</span>
+                  </div>
+                  {lowStock && <div style={{ fontSize: 12, color: "#dc2626", fontWeight: 700, marginBottom: 10 }}>Only {p.stock} left!</div>}
+                  <button
+                    className="ll-btn ll-btn-primary"
+                    style={{ width: "100%", justifyContent: "center", marginTop: 10, opacity: soldOut ? 0.5 : 1, cursor: soldOut ? "not-allowed" : "pointer" }}
+                    disabled={soldOut}
+                    onClick={() => !soldOut && onBuyNow(p.stallItemId)}
+                  >
+                    {soldOut ? "Sold Out" : "Buy Now"}
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ textAlign: "center", padding: "0 24px 60px", fontSize: 13, color: BRAND.grey }}>
+        Only applicable to current stock on hand. While stocks last.
+      </div>
+    </div>
+  );
+}
+
 // ─── Public Order Form ───
-function OrderFormPage({ products, onSubmit }) {
+function OrderFormPage({ products, saleProducts = [], preselectSaleItemId, onPreselectHandled, onSubmit }) {
   const [client, setClient] = useState({ name: "", email: "", phone: "", address: "", city: "", province: "", postalCode: "" });
   const [items, setItems] = useState([]);
   const [courier, setCourier] = useState("standard");
   const [notes, setNotes] = useState("");
   const [errors, setErrors] = useState({});
   const setC = (k, v) => setClient(c => ({ ...c, [k]: v }));
+  const allSelectable = [...products, ...saleProducts];
 
   const toggleProduct = (p) => {
     const exists = items.find(it => it.productId === p.id);
     if (exists) setItems(items.filter(it => it.productId !== p.id));
     else setItems([...items, { productId: p.id, name: p.name, price: p.price, qty: 1, size: "", styleIndex: null, styleLabel: "" }]);
   };
-  const setQty = (pid, qty) => setItems(items.map(it => it.productId === pid ? { ...it, qty: Math.max(1, qty) } : it));
+
+  const preselectHandledRef = useRef(null);
+  useEffect(() => {
+    if (!preselectSaleItemId || preselectHandledRef.current === preselectSaleItemId) return;
+    preselectHandledRef.current = preselectSaleItemId;
+    const match = saleProducts.find(sp => sp.stallItemId === preselectSaleItemId);
+    if (match) {
+      setItems(prev => prev.find(it => it.productId === match.id) ? prev : [...prev, { productId: match.id, name: match.name, price: match.price, qty: 1, size: "", styleIndex: null, styleLabel: "" }]);
+    }
+    onPreselectHandled?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preselectSaleItemId]);
+
+  const setQty = (pid, qty) => setItems(items.map(it => {
+    if (it.productId !== pid) return it;
+    const saleMatch = saleProducts.find(sp => sp.id === pid);
+    const q = Math.max(1, qty);
+    return { ...it, qty: saleMatch ? Math.min(q, Math.max(1, saleMatch.stock)) : q };
+  }));
   const setItemOption = (pid, patch) => setItems(items.map(it => it.productId === pid ? { ...it, ...patch } : it));
   const total = items.reduce((s, it) => s + parsePrice(it.price) * it.qty, 0);
   const courierFee = courier === "express" ? 250 : courier === "standard" ? 150 : 0;
@@ -2529,8 +2886,10 @@ function OrderFormPage({ products, onSubmit }) {
     if (courier !== "collect" && !client.address.trim()) e.address = true;
     if (items.length === 0) e.items = true;
     items.forEach(it => {
-      const p = products.find(x => x.id === it.productId);
-      if (!p || !productNeedsOrderOptions(p)) return;
+      const p = allSelectable.find(x => x.id === it.productId);
+      if (!p) return;
+      if (p.isSaleItem && (p.stock <= 0 || it.qty > p.stock)) e.saleStock = true;
+      if (!productNeedsOrderOptions(p)) return;
       const sizes = getProductSizes(p);
       const styles = getProductStyles(p);
       if (sizes.length && !it.size) e.itemOptions = true;
@@ -2564,11 +2923,60 @@ function OrderFormPage({ products, onSubmit }) {
         </div>
       </div>
 
+      {/* On Sale */}
+      {saleProducts.length > 0 && (
+        <div style={{ marginBottom: 32 }}>
+          <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 16, fontWeight: 700, color: BRAND.purple, marginBottom: 4 }}>🔥 On Sale — While Stocks Last</h3>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
+            {saleProducts.map(p => {
+              const sel = items.find(it => it.productId === p.id);
+              const soldOut = p.stock <= 0;
+              return (
+                <div
+                  key={p.id}
+                  onClick={() => !soldOut && !sel && toggleProduct(p)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 14, padding: "12px 16px", borderRadius: 10,
+                    border: sel ? `2px solid ${BRAND.purple}` : `1px solid ${BRAND.greyLight}`, background: sel ? BRAND.purpleLight : BRAND.white,
+                    cursor: soldOut ? "not-allowed" : "pointer", opacity: soldOut ? 0.5 : 1, transition: "all 0.2s",
+                  }}
+                >
+                  <div style={{ width: 22, height: 22, borderRadius: 4, border: sel ? `2px solid ${BRAND.purple}` : `2px solid ${BRAND.greyLight}`, background: sel ? BRAND.purple : BRAND.white, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    {sel && <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={BRAND.white} strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 600, fontSize: 14, color: BRAND.black }}>{p.name}</div>
+                    <div style={{ fontSize: 12, color: BRAND.grey }}>{titleCaseCategory(p.category)}</div>
+                  </div>
+                  {soldOut ? (
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.4, textTransform: "uppercase", background: "#dc2626", color: BRAND.white, padding: "5px 10px", borderRadius: 100, flexShrink: 0 }}>Sold Out</span>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                      <span style={{ fontSize: 13, color: BRAND.grey, textDecoration: "line-through" }}>{p.originalPrice}</span>
+                      <span style={{ fontWeight: 800, color: BRAND.purple, fontSize: 14 }}>{p.price}</span>
+                    </div>
+                  )}
+                  {sel && !soldOut && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => setQty(p.id, sel.qty - 1)} style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${BRAND.greyLight}`, background: BRAND.white, cursor: "pointer", fontSize: 16, fontWeight: 700 }}>{"−"}</button>
+                      <span style={{ width: 24, textAlign: "center", fontWeight: 700, fontSize: 14 }}>{sel.qty}</span>
+                      <button onClick={() => setQty(p.id, sel.qty + 1)} style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${BRAND.greyLight}`, background: BRAND.white, cursor: "pointer", fontSize: 16, fontWeight: 700 }}>+</button>
+                      <button onClick={() => toggleProduct(p)} style={{ marginLeft: 4, background: "none", border: "none", cursor: "pointer", color: "#dc2626", fontSize: 16 }}>{"✕"}</button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* Product selection */}
       <div style={{ marginBottom: 32 }}>
         <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 16, fontWeight: 700, color: BRAND.black, marginBottom: 4 }}>Select Products *</h3>
         {errors.items && <p style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>Please select at least one product</p>}
         {errors.itemOptions && <p style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>Please choose a size and style for each shirt with options</p>}
+        {errors.saleStock && <p style={{ fontSize: 12, color: "#dc2626", marginBottom: 8 }}>One of your sale items is sold out or below the quantity you selected — please adjust.</p>}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginTop: 12 }}>
           {products.map(p => {
             const sel = items.find(it => it.productId === p.id);
