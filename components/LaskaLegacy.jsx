@@ -860,11 +860,18 @@ export default function LaskaLegacy() {
   };
 
   const navLinks = [
-    ["home", "Home"], ["shop", "Shop"], ["horses", "Horses"], ["about", "About"],
-    ["gallery", "Gallery"], ["blog", "Blog"],
+    ["home", "Home"], ["shop", "Shop"],
     ...(activeSale ? [["sale", "Sale"]] : []),
+    ["horses", "Horses"], ["about", "About"],
+    ["gallery", "Gallery"], ["blog", "Blog"],
     ["order", "Order"], ["contact", "Contact"], ["admin", "Admin"],
   ];
+
+  const saleProductNames = new Set(
+    (activeSale?.sale_items || [])
+      .map(si => (si.stall_items?.name || "").trim().toLowerCase())
+      .filter(Boolean)
+  );
 
   if (loading) return (
     <GallopLoader />
@@ -1092,17 +1099,26 @@ export default function LaskaLegacy() {
             </div>
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 24 }}>
-            {products.filter(p => filter === "all" || p.category === filter).map((p, i) => (
-              <div key={p.id} className="product-card fade-up" style={{ animationDelay: `${i * 0.05}s` }} onClick={() => navigate("product", p)}>
-                <ProductImage name={p.name} category={p.category} images={p.images} />
-                <div style={{ padding: "20px 20px 24px" }}>
-                  <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 6, fontWeight: 700 }}>{allCategories[p.category]?.label || titleCaseCategory(p.category)}</div>
-                  <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 17, color: BRAND.black, fontWeight: 700, marginBottom: 4 }}>{p.name}</h3>
-                  <p style={{ fontSize: 13, color: BRAND.grey, lineHeight: 1.5, marginBottom: 10 }}>{p.description.slice(0, 80)}{"\u2026"}</p>
-                  <div style={{ fontSize: 16, fontWeight: 800, color: BRAND.purple }}>{p.price}</div>
+            {products.filter(p => filter === "all" || p.category === filter).map((p, i) => {
+              const onSale = saleProductNames.has((p.name || "").trim().toLowerCase());
+              return (
+                <div key={p.id} className="product-card fade-up" style={{ animationDelay: `${i * 0.05}s`, position: "relative" }} onClick={() => navigate(onSale ? "sale" : "product", onSale ? undefined : p)}>
+                  {onSale && (
+                    <span style={{ position: "absolute", top: 12, left: 12, zIndex: 1, fontSize: 10, fontWeight: 800, letterSpacing: 1.2, textTransform: "uppercase", background: BRAND.purple, color: BRAND.white, padding: "5px 10px", borderRadius: 100, boxShadow: "0 2px 8px rgba(0,0,0,0.2)" }}>
+                      {"\ud83d\udd25"} On Sale
+                    </span>
+                  )}
+                  <ProductImage name={p.name} category={p.category} images={p.images} />
+                  <div style={{ padding: "20px 20px 24px" }}>
+                    <div style={{ fontSize: 10, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 6, fontWeight: 700 }}>{allCategories[p.category]?.label || titleCaseCategory(p.category)}</div>
+                    <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 17, color: BRAND.black, fontWeight: 700, marginBottom: 4 }}>{p.name}</h3>
+                    <p style={{ fontSize: 13, color: BRAND.grey, lineHeight: 1.5, marginBottom: 10 }}>{p.description.slice(0, 80)}{"\u2026"}</p>
+                    <div style={{ fontSize: 16, fontWeight: 800, color: BRAND.purple }}>{p.price}</div>
+                    {onSale && <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.purple, marginTop: 4 }}>View on the Sale page {"\u2192"}</div>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {products.filter(p => filter === "all" || p.category === filter).length === 0 && (
             <p style={{ textAlign: "center", color: BRAND.grey, padding: 48, fontSize: 15 }}>No products in this category yet.</p>
