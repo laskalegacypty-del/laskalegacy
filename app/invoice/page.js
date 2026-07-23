@@ -65,6 +65,13 @@ export default function InvoicePage() {
   const [redownloadingId, setRedownloadingId] = useState(null);
   const [toast, setToast] = useState(null);
 
+  const [customerName, setCustomerName] = useState("");
+  const [customerPhone, setCustomerPhone] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
+  const [showCustomerFields, setShowCustomerFields] = useState(false);
+
+  const [editingInvoice, setEditingInvoice] = useState(null); // { id, invoice_number, invoice_date } or null
+
   useEffect(() => {
     (async () => {
       const [products, stallItems, peek, hist] = await Promise.all([
@@ -111,30 +118,59 @@ export default function InvoicePage() {
 
   const total = items.reduce((s, it) => s + it.quantity * it.price, 0);
 
-  const buildAndDownload = async (invoiceNumber, invoiceItems, invoiceTotal, invoiceDate) => {
+  const buildAndDownload = async (invoiceNumber, invoiceItems, invoiceTotal, invoiceDate, customer = {}) => {
     const [{ pdf }, { default: InvoiceDocument }, logoDataUrl] = await Promise.all([
       import("@react-pdf/renderer"),
       import("./InvoiceDocument"),
       logoToDataUrl("/logo-icon.png"),
     ]);
     const blob = await pdf(
-      <InvoiceDocument invoiceNumber={invoiceNumber} items={invoiceItems} total={invoiceTotal} logoDataUrl={logoDataUrl} />
+      <InvoiceDocument
+        invoiceNumber={invoiceNumber}
+        items={invoiceItems}
+        total={invoiceTotal}
+        logoDataUrl={logoDataUrl}
+        customerName={customer.name}
+        customerPhone={customer.phone}
+        customerEmail={customer.email}
+      />
     ).toBlob();
     downloadBlob(blob, `LL_INV${invoiceNumber}_${filenameDate(invoiceDate)}.pdf`);
+  };
+
+  const resetBuilder = () => {
+    setItems([]);
+    setCustomerName("");
+    setCustomerPhone("");
+    setCustomerEmail("");
+    setShowCustomerFields(false);
+    setEditingInvoice(null);
   };
 
   const handleGenerate = async () => {
     if (items.length === 0 || generating) return;
     setGenerating(true);
+    const customer = { name: customerName, phone: customerPhone, email: customerEmail };
     try {
-      const invoiceNumber = await db.getNextManualInvoiceNumber();
-      const invoiceDate = todayISO();
-      await buildAndDownload(invoiceNumber, items, total, invoiceDate);
-      const saved = await db.createManualInvoice({ invoiceNumber, invoiceDate, items, total });
-      setHistory(prev => [saved, ...prev]);
-      setNextNumber(invoiceNumber + 1);
-      setItems([]);
-      showToast(`Invoice #${invoiceNumber} downloaded`);
+      if (editingInvoice) {
+        await buildAndDownload(editingInvoice.invoice_number, items, total, editingInvoice.invoice_date, customer);
+        const saved = await db.updateManualInvoice(editingInvoice.id, {
+          items, total, customerName, customerPhone, customerEmail,
+        });
+        setHistory(prev => prev.map(h => h.id === saved.id ? saved : h));
+        showToast(`Invoice #${editingInvoice.invoice_number} updated`);
+      } else {
+        const invoiceNumber = await db.getNextManualInvoiceNumber();
+        const invoiceDate = todayISO();
+        await buildAndDownload(invoiceNumber, items, total, invoiceDate, customer);
+        const saved = await db.createManualInvoice({
+          invoiceNumber, invoiceDate, items, total, customerName, customerPhone, customerEmail,
+        });
+        setHistory(prev => [saved, ...prev]);
+        setNextNumber(invoiceNumber + 1);
+        showToast(`Invoice #${invoiceNumber} downloaded`);
+      }
+      resetBuilder();
     } catch (err) {
       console.error(err);
       showToast("Something went wrong generating the invoice");
@@ -145,12 +181,27 @@ export default function InvoicePage() {
   const handleRedownload = async (inv) => {
     setRedownloadingId(inv.id);
     try {
-      await buildAndDownload(inv.invoice_number, inv.items, inv.total, inv.invoice_date);
+      await buildAndDownload(inv.invoice_number, inv.items, inv.total, inv.invoice_date, {
+        name: inv.customer_name, phone: inv.customer_phone, email: inv.customer_email,
+      });
     } catch (err) {
       console.error(err);
       showToast("Couldn't re-download that invoice");
     }
     setRedownloadingId(null);
+  };
+
+  const handleEditInvoice = (inv) => {
+    if (items.length > 0 && !editingInvoice) {
+      if (!confirm("This will replace the items you're currently working on. Continue?")) return;
+    }
+    setItems((inv.items || []).map(it => ({ ...it })));
+    setCustomerName(inv.customer_name || "");
+    setCustomerPhone(inv.customer_phone || "");
+    setCustomerEmail(inv.customer_email || "");
+    setShowCustomerFields(Boolean(inv.customer_name || inv.customer_phone || inv.customer_email));
+    setEditingInvoice({ id: inv.id, invoice_number: inv.invoice_number, invoice_date: inv.invoice_date });
+    window.scrollTo?.({ top: 0, behavior: "smooth" });
   };
 
   return (
@@ -173,6 +224,13 @@ export default function InvoicePage() {
         <p style={{ textAlign: "center", padding: 60, color: BRAND.grey, fontSize: 14 }}>Loading…</p>
       ) : (
         <div style={{ maxWidth: 560, margin: "0 auto", padding: "24px 16px" }}>
+
+          {editingInvoice && (
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: BRAND.purpleLight, border: `1px solid ${BRAND.purple}`, borderRadius: 10, padding: "10px 14px", marginBottom: 20 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: BRAND.purple }}>Editing Invoice #{editingInvoice.invoice_number}</span>
+              <button onClick={resetBuilder} style={{ background: "none", border: "none", color: BRAND.purple, fontWeight: 700, fontSize: 12, cursor: "pointer", textDecoration: "underline" }}>Cancel</button>
+            </div>
+          )}
 
           {/* Search / add items */}
           <div style={{ marginBottom: 20 }}>
@@ -243,6 +301,37 @@ export default function InvoicePage() {
             ))}
           </div>
 
+          {/* Customer details (optional) */}
+          <div style={{ marginBottom: 20 }}>
+            {!showCustomerFields ? (
+              <button
+                onClick={() => setShowCustomerFields(true)}
+                style={{ background: "none", border: `1px dashed ${BRAND.greyLight}`, borderRadius: 10, padding: "12px 16px", width: "100%", textAlign: "left", color: BRAND.grey, fontSize: 13, fontWeight: 700, cursor: "pointer" }}
+              >
+                {"+"} Add customer details (optional)
+              </button>
+            ) : (
+              <div style={{ background: BRAND.white, borderRadius: 10, border: `1px solid ${BRAND.greyLight}`, padding: 14 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, color: BRAND.grey, textTransform: "uppercase" }}>Customer Details (optional)</span>
+                  <button onClick={() => { setShowCustomerFields(false); setCustomerName(""); setCustomerPhone(""); setCustomerEmail(""); }} style={{ background: "none", border: "none", color: "#dc2626", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Remove</button>
+                </div>
+                <input
+                  value={customerName} onChange={e => setCustomerName(e.target.value)} placeholder="Name"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 6, border: `1px solid ${BRAND.greyLight}`, fontSize: 14, boxSizing: "border-box", marginBottom: 8 }}
+                />
+                <input
+                  value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} placeholder="Phone"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 6, border: `1px solid ${BRAND.greyLight}`, fontSize: 14, boxSizing: "border-box", marginBottom: 8 }}
+                />
+                <input
+                  value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} placeholder="Email"
+                  style={{ width: "100%", padding: "10px 12px", borderRadius: 6, border: `1px solid ${BRAND.greyLight}`, fontSize: 14, boxSizing: "border-box" }}
+                />
+              </div>
+            )}
+          </div>
+
           {items.length > 0 && (
             <div style={{ background: BRAND.tealLight, borderRadius: 10, padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
               <span style={{ fontWeight: 700, color: BRAND.tealDark, fontSize: 14 }}>Total</span>
@@ -259,7 +348,7 @@ export default function InvoicePage() {
               fontSize: 15, fontWeight: 700, cursor: items.length === 0 || generating ? "not-allowed" : "pointer",
             }}
           >
-            {generating ? "Generating…" : "Generate & Download Invoice"}
+            {generating ? "Generating…" : editingInvoice ? "Save Changes & Re-download" : "Generate & Download Invoice"}
           </button>
 
           {/* Recent invoices */}
@@ -267,20 +356,28 @@ export default function InvoicePage() {
             <div style={{ marginTop: 40 }}>
               <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 15, fontWeight: 800, color: BRAND.black, marginBottom: 12 }}>Recent Invoices</h2>
               {history.slice(0, 15).map(inv => (
-                <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: BRAND.white, borderRadius: 10, border: `1px solid ${BRAND.greyLight}`, padding: "12px 14px", marginBottom: 8 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 13, color: BRAND.black }}>Invoice #{inv.invoice_number}</div>
+                <div key={inv.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: BRAND.white, borderRadius: 10, border: `1px solid ${BRAND.greyLight}`, padding: "12px 14px", marginBottom: 8, gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 13, color: BRAND.black }}>Invoice #{inv.invoice_number}{inv.customer_name ? ` — ${inv.customer_name}` : ""}</div>
                     <div style={{ fontSize: 12, color: BRAND.grey }}>
                       {new Date(inv.invoice_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })} {"·"} {formatZAR(inv.total)} {"·"} {(inv.items || []).length} item{(inv.items || []).length !== 1 ? "s" : ""}
                     </div>
                   </div>
-                  <button
-                    onClick={() => handleRedownload(inv)}
-                    disabled={redownloadingId === inv.id}
-                    style={{ flexShrink: 0, padding: "8px 14px", borderRadius: 100, border: `1px solid ${BRAND.teal}`, background: BRAND.white, color: BRAND.teal, fontSize: 12, fontWeight: 700, cursor: redownloadingId === inv.id ? "wait" : "pointer" }}
-                  >
-                    {redownloadingId === inv.id ? "…" : "Re-download"}
-                  </button>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                    <button
+                      onClick={() => handleEditInvoice(inv)}
+                      style={{ padding: "8px 14px", borderRadius: 100, border: `1px solid ${BRAND.greyLight}`, background: BRAND.white, color: BRAND.black, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleRedownload(inv)}
+                      disabled={redownloadingId === inv.id}
+                      style={{ padding: "8px 14px", borderRadius: 100, border: `1px solid ${BRAND.teal}`, background: BRAND.white, color: BRAND.teal, fontSize: 12, fontWeight: 700, cursor: redownloadingId === inv.id ? "wait" : "pointer" }}
+                    >
+                      {redownloadingId === inv.id ? "…" : "Re-download"}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

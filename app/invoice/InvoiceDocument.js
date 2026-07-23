@@ -29,9 +29,13 @@ const styles = StyleSheet.create({
   totalValueCell: { width: '20%', padding: 8, justifyContent: 'center' },
   totalValue: { fontSize: 11, fontFamily: 'Helvetica-Bold', textAlign: 'center' },
   footer: { marginTop: 60, textAlign: 'center', fontSize: 11, fontFamily: 'Helvetica-Bold' },
+  billTo: { marginBottom: 16 },
+  billToTitle: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: GREY, marginBottom: 3 },
+  billToLine: { fontSize: 10, marginBottom: 1 },
 });
 
-export default function InvoiceDocument({ invoiceNumber, items, total, logoDataUrl }) {
+export default function InvoiceDocument({ invoiceNumber, items, total, logoDataUrl, customerName, customerPhone, customerEmail }) {
+  const hasCustomer = Boolean((customerName || "").trim() || (customerPhone || "").trim() || (customerEmail || "").trim());
   return (
     <Document>
       <Page size="A4" style={styles.page}>
@@ -54,6 +58,15 @@ export default function InvoiceDocument({ invoiceNumber, items, total, logoDataU
             <Text style={styles.bankLine}>Reference: Invoice number</Text>
           </View>
         </View>
+
+        {hasCustomer && (
+          <View style={styles.billTo}>
+            <Text style={styles.billToTitle}>BILLED TO</Text>
+            {customerName?.trim() && <Text style={styles.billToLine}>{customerName.trim()}</Text>}
+            {customerPhone?.trim() && <Text style={styles.billToLine}>{customerPhone.trim()}</Text>}
+            {customerEmail?.trim() && <Text style={styles.billToLine}>{customerEmail.trim()}</Text>}
+          </View>
+        )}
 
         <View style={styles.table}>
           <View style={styles.headerRow}>
