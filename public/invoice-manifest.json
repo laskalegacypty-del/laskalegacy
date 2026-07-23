@@ -1,0 +1,15 @@
+{
+  "name": "Laska Legacy Invoicing",
+  "short_name": "LL Invoice",
+  "description": "Private invoicing tool for Laska Legacy",
+  "start_url": "/invoice",
+  "scope": "/invoice",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f8fa",
+  "theme_color": "#000000",
+  "icons": [
+    { "src": "/logo-icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "any" },
+    { "src": "/logo-icon.png", "sizes": "1024x1024", "type": "image/png", "purpose": "maskable" }
+  ]
+}
