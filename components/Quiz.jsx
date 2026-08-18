@@ -79,6 +79,113 @@ function playChime(audioCtxRef, big) {
   });
 }
 
+function normalizeSAPhone(raw) {
+  const digits = String(raw || '').replace(/[^\d+]/g, '');
+  const match = digits.match(/^(?:\+?27|0)(\d{9})$/);
+  if (!match) return null;
+  return '+27' + match[1];
+}
+
+function LuckyDrawEntry({ level, chances }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [step, setStep] = useState('form'); // form | verify | submitting | done
+  const [error, setError] = useState('');
+
+  const normalized = normalizeSAPhone(phone);
+  const canVerify = name.trim().length > 0 && !!normalized;
+
+  function openWhatsAppVerify() {
+    if (!canVerify) return;
+    const msg = `Laska Legacy WMG Quiz — confirming ${name.trim()}'s lucky draw entry (Level ${level}, ${chances} chance${chances === 1 ? '' : 's'}). Good luck! 🎉`;
+    const url = `https://wa.me/${normalized.replace('+', '')}?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+    setError('');
+    setStep('verify');
+  }
+
+  async function submitEntry() {
+    setStep('submitting');
+    setError('');
+    try {
+      await db.saveQuizEntry({ name: name.trim(), phone: normalized, level, chances, whatsapp_confirmed: true });
+      setStep('done');
+    } catch (err) {
+      console.error(err);
+      setError('Could not save your entry — please try again.');
+      setStep('verify');
+    }
+  }
+
+  if (step === 'done') {
+    return (
+      <div className="quiz-in" style={{ background: BRAND.tealLight, borderRadius: 14, padding: '18px 16px', marginBottom: 22, textAlign: 'center' }}>
+        <div style={{ fontSize: 28, marginBottom: 4 }}>🎟️</div>
+        <div style={{ fontWeight: 800, fontSize: 15, color: BRAND.black, marginBottom: 4 }}>You're entered!</div>
+        <div style={{ fontSize: 13, color: BRAND.tealDark }}>{chances} chance{chances === 1 ? '' : 's'} in the lucky draw. Good luck!</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: BRAND.offWhite, border: `1px solid ${BRAND.greyLight}`, borderRadius: 14, padding: '18px 16px', marginBottom: 22, textAlign: 'left' }}>
+      <div style={{ fontWeight: 800, fontSize: 14, color: BRAND.black, marginBottom: 2 }}>🎟️ Enter the Lucky Draw</div>
+      <div style={{ fontSize: 12, color: BRAND.grey, marginBottom: 12 }}>{chances} chance{chances === 1 ? '' : 's'} from this round — add your details and confirm on WhatsApp.</div>
+
+      {step === 'form' && (
+        <>
+          <input
+            placeholder="Full name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: `1px solid ${BRAND.greyLight}`, fontSize: 14, marginBottom: 8 }}
+          />
+          <input
+            placeholder="Cell number (e.g. 082 123 4567)"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            style={{ width: '100%', boxSizing: 'border-box', padding: '11px 14px', borderRadius: 10, border: `1px solid ${BRAND.greyLight}`, fontSize: 14, marginBottom: 4 }}
+          />
+          {phone.trim().length > 0 && !normalized && (
+            <div style={{ fontSize: 11.5, color: BRAND.red, marginBottom: 8 }}>Enter a valid South African cell number.</div>
+          )}
+          <button
+            className="quiz-btn"
+            disabled={!canVerify}
+            onClick={openWhatsAppVerify}
+            style={{ width: '100%', marginTop: 8, padding: '12px 16px', borderRadius: 100, fontSize: 13.5, fontWeight: 800, cursor: canVerify ? 'pointer' : 'not-allowed', border: 'none', background: canVerify ? '#25D366' : BRAND.greyLight, color: canVerify ? BRAND.white : BRAND.grey }}
+          >
+            Verify via WhatsApp
+          </button>
+        </>
+      )}
+
+      {(step === 'verify' || step === 'submitting') && (
+        <>
+          <div style={{ fontSize: 12.5, color: BRAND.black, background: BRAND.tealLight, borderRadius: 10, padding: '10px 12px', marginBottom: 10, lineHeight: 1.5 }}>
+            We opened WhatsApp with a confirmation message to <strong>{phone}</strong>. Send it, then tap below. If WhatsApp said the number was invalid, go back and fix it.
+          </div>
+          {error && <div style={{ fontSize: 11.5, color: BRAND.red, marginBottom: 8 }}>{error}</div>}
+          <button
+            className="quiz-btn"
+            onClick={submitEntry}
+            disabled={step === 'submitting'}
+            style={{ width: '100%', padding: '12px 16px', borderRadius: 100, fontSize: 13.5, fontWeight: 800, cursor: 'pointer', border: 'none', background: BRAND.green, color: BRAND.white, marginBottom: 8 }}
+          >
+            {step === 'submitting' ? 'Saving…' : "I've sent it — enter me in the draw"}
+          </button>
+          <button
+            onClick={() => setStep('form')}
+            style={{ display: 'block', margin: '0 auto', background: 'none', border: 'none', color: BRAND.grey, fontSize: 12, cursor: 'pointer' }}
+          >
+            ← Edit number
+          </button>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function Quiz() {
   const [screen, setScreen] = useState('start'); // start | playing | result
   const [mode, setMode] = useState('adults'); // kids (1-3) | adults (1-5)
@@ -368,6 +475,8 @@ export default function Quiz() {
                   <div style={{ fontSize: 13.5, color: BRAND.grey, lineHeight: 1.5 }}>{bonusQ.a}</div>
                 </div>
               )}
+
+              <LuckyDrawEntry level={reachedLevel} chances={reachedLevel + 1} />
 
               <button
                 className="quiz-btn"

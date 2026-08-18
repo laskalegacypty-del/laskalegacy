@@ -527,6 +527,7 @@ export default function LaskaLegacy() {
   const [editStallItem, setEditStallItem] = useState(null);
   const [quizQuestions, setQuizQuestions] = useState([]);
   const [editQuizQuestion, setEditQuizQuestion] = useState(null);
+  const [quizEntries, setQuizEntries] = useState([]);
   const [stallEvents, setStallEvents] = useState([]);
   const [activeStallEvent, setActiveStallEvent] = useState(null);
   const [selectedStallEvent, setSelectedStallEvent] = useState(null);
@@ -619,7 +620,7 @@ export default function LaskaLegacy() {
         });
         setCustomCategories(inferredCategories);
         setCustomSubcategories(inferredSubcategories);
-        const [msgs, gal, ords, posts, hrs, stallItms, stallEvts, activeEvt, salesList, activeSaleData, quizQs] = await Promise.all([
+        const [msgs, gal, ords, posts, hrs, stallItms, stallEvts, activeEvt, salesList, activeSaleData, quizQs, quizEntriesList] = await Promise.all([
           safeLoad(db.loadMessages, []),
           safeLoad(db.loadGallery, []),
           safeLoad(db.loadOrders, []),
@@ -631,6 +632,7 @@ export default function LaskaLegacy() {
           safeLoad(db.loadSales, []),
           safeLoad(db.getActiveSale, null),
           safeLoad(db.loadQuizQuestions, []),
+          safeLoad(db.loadQuizEntries, []),
         ]);
         if (cancelled) return;
         setMessages(msgs);
@@ -644,6 +646,7 @@ export default function LaskaLegacy() {
         setSales(salesList);
         setActiveSale(activeSaleData);
         setQuizQuestions(quizQs);
+        setQuizEntries(quizEntriesList);
       } catch (err) {
         console.error("Failed to load site data:", err);
       } finally {
@@ -824,6 +827,16 @@ export default function LaskaLegacy() {
     await db.deleteQuizQuestion(id);
     setQuizQuestions(quizQuestions.filter(q => q.id !== id));
     showToast("Quiz question removed");
+  };
+  const handleDeleteQuizEntry = async (id) => {
+    await db.deleteQuizEntry(id);
+    setQuizEntries(quizEntries.filter(e => e.id !== id));
+    showToast("Entry removed");
+  };
+  const handleClearQuizEntries = async () => {
+    await db.clearQuizEntries();
+    setQuizEntries([]);
+    showToast("All entries cleared");
   };
   const handleStallStockChange = async (id, stock) => {
     const clamped = Math.max(0, stock);
@@ -1548,6 +1561,10 @@ export default function LaskaLegacy() {
                 <span style={{ fontSize: 14, lineHeight: 1 }}>{"\u2753"}</span>
                 WMG Quiz ({quizQuestions.length})
               </button>
+              <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => navigate("admin-quiz-draw")}>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>{"\ud83c\udfab"}</span>
+                Lucky Draw ({quizEntries.length})
+              </button>
               <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-edit", { id: "", name: "", category: "bridles", subcategory: "", price: "", description: "", images: [], featured: false })}>{Icons.plus} Add Product</button>
             </div>
           </div>
@@ -1777,6 +1794,16 @@ export default function LaskaLegacy() {
       {/* ADMIN WMG QUIZ — edit */}
       {page === "admin-quiz-edit" && adminAuth && editQuizQuestion && (
         <AdminQuizEditPage question={editQuizQuestion} onSave={handleSaveQuizQuestion} onCancel={() => navigate("admin-quiz")} showToast={showToast} />
+      )}
+
+      {/* ADMIN WMG QUIZ — lucky draw */}
+      {page === "admin-quiz-draw" && adminAuth && (
+        <AdminQuizDrawPage
+          entries={quizEntries}
+          onBack={() => navigate("admin")}
+          onDelete={(id) => { if (confirm("Remove this entry?")) handleDeleteQuizEntry(id); }}
+          onClearAll={() => { if (confirm("Clear every entry? This can't be undone.")) handleClearQuizEntries(); }}
+        />
       )}
 
       {/* ADMIN STALL EVENTS — list */}
@@ -2411,6 +2438,70 @@ function AdminQuizEditPage({ question, onSave, onCancel, showToast }) {
         <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.question && form.answer && form.topic) onSave(form); else showToast("Topic, question, and answer are required"); }}>Save Question</button>
         <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
       </div>
+    </div>
+  );
+}
+
+function pickWeightedWinner(entries) {
+  const pool = [];
+  entries.forEach(e => {
+    const chances = Math.max(1, e.chances || 1);
+    for (let i = 0; i < chances; i++) pool.push(e);
+  });
+  if (pool.length === 0) return null;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function AdminQuizDrawPage({ entries, onBack, onDelete, onClearAll }) {
+  const [winner, setWinner] = useState(null);
+  const totalChances = entries.reduce((sum, e) => sum + Math.max(1, e.chances || 1), 0);
+
+  const runDraw = () => {
+    const picked = pickWeightedWinner(entries);
+    if (!picked) return;
+    setWinner(picked);
+  };
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Admin</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>WMG Quiz Lucky Draw</h1>
+          <p style={{ fontSize: 13, color: BRAND.grey }}>{entries.length} entr{entries.length !== 1 ? "ies" : "y"} {"·"} {totalChances} chance{totalChances !== 1 ? "s" : ""} in the pool</p>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="ll-btn ll-btn-outline ll-btn-sm" style={{ color: "#dc2626" }} onClick={onClearAll} disabled={entries.length === 0}>{Icons.trash} Clear All</button>
+          <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={runDraw} disabled={entries.length === 0}>{"🎉"} Run Draw</button>
+        </div>
+      </div>
+
+      {winner && (
+        <div className="fade-in" style={{ background: `linear-gradient(135deg, ${BRAND.purple}, ${BRAND.teal})`, borderRadius: 16, padding: "24px 22px", marginBottom: 28, textAlign: "center", color: BRAND.white }}>
+          <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", fontWeight: 700, opacity: 0.85, marginBottom: 8 }}>{"🎉"} Winner</div>
+          <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, fontWeight: 800, marginBottom: 4 }}>{winner.name}</div>
+          <div style={{ fontSize: 14, opacity: 0.9, marginBottom: 16 }}>{winner.phone} {"·"} Level {winner.level} {"·"} {Math.max(1, winner.chances || 1)} chance{winner.chances !== 1 ? "s" : ""}</div>
+          <a
+            href={`https://wa.me/${String(winner.phone || "").replace(/[^\d]/g, "")}?text=${encodeURIComponent(`Congratulations ${winner.name}! You won the Laska Legacy WMG Quiz lucky draw! 🎉`)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "#25D366", color: BRAND.white, padding: "12px 20px", borderRadius: 100, fontSize: 14, fontWeight: 700, textDecoration: "none" }}
+          >
+            Message Winner on WhatsApp
+          </a>
+        </div>
+      )}
+
+      {entries.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No entries yet — they'll show up here as players finish rounds on /quiz.</p>}
+      {entries.map(e => (
+        <div key={e.id} className="admin-row">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{e.name}</div>
+            <div style={{ fontSize: 12, color: BRAND.grey }}>{e.phone} {"·"} Level {e.level} {"·"} {Math.max(1, e.chances || 1)} chance{e.chances !== 1 ? "s" : ""}{e.whatsapp_confirmed ? " · ✅ WhatsApp confirmed" : ""}</div>
+          </div>
+          <button className="icon-btn" style={{ color: "#dc2626" }} onClick={() => onDelete(e.id)}>{Icons.trash}</button>
+        </div>
+      ))}
     </div>
   );
 }
