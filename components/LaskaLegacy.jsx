@@ -516,6 +516,8 @@ export default function LaskaLegacy() {
   const [editHorse, setEditHorse] = useState(null);
   const [stallItems, setStallItems] = useState([]);
   const [editStallItem, setEditStallItem] = useState(null);
+  const [quizQuestions, setQuizQuestions] = useState([]);
+  const [editQuizQuestion, setEditQuizQuestion] = useState(null);
   const [stallEvents, setStallEvents] = useState([]);
   const [activeStallEvent, setActiveStallEvent] = useState(null);
   const [selectedStallEvent, setSelectedStallEvent] = useState(null);
@@ -608,7 +610,7 @@ export default function LaskaLegacy() {
         });
         setCustomCategories(inferredCategories);
         setCustomSubcategories(inferredSubcategories);
-        const [msgs, gal, ords, posts, hrs, stallItms, stallEvts, activeEvt, salesList, activeSaleData] = await Promise.all([
+        const [msgs, gal, ords, posts, hrs, stallItms, stallEvts, activeEvt, salesList, activeSaleData, quizQs] = await Promise.all([
           safeLoad(db.loadMessages, []),
           safeLoad(db.loadGallery, []),
           safeLoad(db.loadOrders, []),
@@ -619,6 +621,7 @@ export default function LaskaLegacy() {
           safeLoad(db.getActiveStallEvent, null),
           safeLoad(db.loadSales, []),
           safeLoad(db.getActiveSale, null),
+          safeLoad(db.loadQuizQuestions, []),
         ]);
         if (cancelled) return;
         setMessages(msgs);
@@ -631,6 +634,7 @@ export default function LaskaLegacy() {
         setActiveStallEvent(activeEvt);
         setSales(salesList);
         setActiveSale(activeSaleData);
+        setQuizQuestions(quizQs);
       } catch (err) {
         console.error("Failed to load site data:", err);
       } finally {
@@ -702,6 +706,7 @@ export default function LaskaLegacy() {
       if (p === "horse-detail") setSelectedHorse(data);
       if (p === "admin-horse-edit") setEditHorse(data);
       if (p === "admin-stall-edit") setEditStallItem(data);
+      if (p === "admin-quiz-edit") setEditQuizQuestion(data);
       if (p === "admin-stall-event-detail") setSelectedStallEvent(data);
       if (p === "admin-sale-edit") setEditSale(data);
       if (p === "order") setPreselectSaleItemId(data || null);
@@ -796,6 +801,20 @@ export default function LaskaLegacy() {
     await db.deleteStallItem(item.id);
     setStallItems(stallItems.filter(s => s.id !== item.id));
     showToast("Item removed");
+  };
+  const handleSaveQuizQuestion = async (q) => {
+    const saved = await db.saveQuizQuestion(q);
+    if (q.id) {
+      setQuizQuestions(quizQuestions.map(item => item.id === saved.id ? saved : item));
+    } else {
+      setQuizQuestions([...quizQuestions, saved]);
+    }
+    showToast("Quiz question saved"); navigate("admin-quiz");
+  };
+  const handleDeleteQuizQuestion = async (id) => {
+    await db.deleteQuizQuestion(id);
+    setQuizQuestions(quizQuestions.filter(q => q.id !== id));
+    showToast("Quiz question removed");
   };
   const handleStallStockChange = async (id, stock) => {
     const clamped = Math.max(0, stock);
@@ -1516,6 +1535,10 @@ export default function LaskaLegacy() {
                 <span style={{ fontSize: 14, lineHeight: 1 }}>{"\uD83D\uDD25"}</span>
                 Sale {activeSale ? "(Live)" : ""}
               </button>
+              <button className="ll-btn ll-btn-outline ll-btn-sm" onClick={() => navigate("admin-quiz")}>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>{"\u2753"}</span>
+                WMG Quiz ({quizQuestions.length})
+              </button>
               <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-edit", { id: "", name: "", category: "bridles", subcategory: "", price: "", description: "", images: [], featured: false })}>{Icons.plus} Add Product</button>
             </div>
           </div>
@@ -1730,6 +1753,45 @@ export default function LaskaLegacy() {
       {/* ADMIN STALL LABELS — printable QR sheet */}
       {page === "admin-stall-labels" && adminAuth && (
         <AdminStallLabelsPage stallItems={stallItems} onBack={() => navigate("admin-stall")} />
+      )}
+
+      {/* ADMIN WMG QUIZ — list */}
+      {page === "admin-quiz" && adminAuth && (
+        <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
+          <button onClick={() => navigate("admin")} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Admin</button>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 16 }}>
+            <div>
+              <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>WMG Quiz</h1>
+              <p style={{ fontSize: 13, color: BRAND.grey }}>{quizQuestions.length} question{quizQuestions.length !== 1 ? "s" : ""} {"·"} feeds the /quiz trivia ladder</p>
+            </div>
+            <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-quiz-edit", { id: "", level: 1, question: "", answer: "", stumper: false })}>{Icons.plus} Add Question</button>
+          </div>
+          {quizQuestions.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No questions yet. Add your first one above!</p>}
+          {[1, 2, 3, 4, 5].map(lvl => {
+            const levelQuestions = quizQuestions.filter(q => q.level === lvl);
+            if (levelQuestions.length === 0) return null;
+            return (
+              <div key={lvl} style={{ marginBottom: 28 }}>
+                <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: BRAND.teal, marginBottom: 10 }}>Level {lvl}</h3>
+                {levelQuestions.map(q => (
+                  <div key={q.id} className="admin-row">
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{q.question}{q.stumper ? " ♦" : ""}</div>
+                      <div style={{ fontSize: 12, color: BRAND.grey }}>{q.answer}</div>
+                    </div>
+                    <button className="icon-btn" onClick={() => navigate("admin-quiz-edit", { ...q })}>{Icons.edit}</button>
+                    <button className="icon-btn" style={{ color: "#dc2626" }} onClick={() => { if (confirm("Delete this question?")) handleDeleteQuizQuestion(q.id); }}>{Icons.trash}</button>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* ADMIN WMG QUIZ — edit */}
+      {page === "admin-quiz-edit" && adminAuth && editQuizQuestion && (
+        <AdminQuizEditPage question={editQuizQuestion} onSave={handleSaveQuizQuestion} onCancel={() => navigate("admin-quiz")} showToast={showToast} />
       )}
 
       {/* ADMIN STALL EVENTS — list */}
@@ -2252,6 +2314,38 @@ function AdminStallItemEditPage({ item, onSave, onCancel, showToast, existingCat
 
       <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
         <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.name && form.price) onSave(form); else showToast("Name and price are required"); }}>Save Item</button>
+        <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
+      </div>
+    </div>
+  );
+}
+
+function AdminQuizEditPage({ question, onSave, onCancel, showToast }) {
+  const [form, setForm] = useState({ ...question });
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 560, margin: "0 auto", padding: "48px 24px" }}>
+      <button onClick={onCancel} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to WMG Quiz</button>
+      <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, color: BRAND.black, fontWeight: 800, marginBottom: 24 }}>{question.id ? "Edit Question" : "Add Question"}</h1>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <div>
+          <label className="ll-label">Level *</label>
+          <select className="ll-input" value={form.level} onChange={e => set("level", parseInt(e.target.value, 10))}>
+            {[1, 2, 3, 4, 5].map(lvl => <option key={lvl} value={lvl}>Level {lvl}</option>)}
+          </select>
+        </div>
+        <div><label className="ll-label">Question *</label><textarea className="ll-input" rows={3} value={form.question} onChange={e => set("question", e.target.value)} placeholder="e.g. What do you call a baby horse?" /></div>
+        <div><label className="ll-label">Answer *</label><textarea className="ll-input" rows={2} value={form.answer} onChange={e => set("answer", e.target.value)} placeholder="e.g. A foal" /></div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: BRAND.black, cursor: "pointer" }}>
+          <input type="checkbox" checked={!!form.stumper} onChange={e => set("stumper", e.target.checked)} style={{ width: "auto", margin: 0 }} />
+          ♦ Stumper — flag as a tough tiebreaker-worthy question
+        </label>
+      </div>
+
+      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+        <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.question && form.answer) onSave(form); else showToast("Question and answer are required"); }}>Save Question</button>
         <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
       </div>
     </div>
