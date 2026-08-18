@@ -414,6 +414,15 @@ const CATEGORIES = {
   bags: { label: "Bags & Canvas", logo: "/category-logo-orange.png" },
 };
 
+const QUIZ_TOPICS = [
+  "Horse Basics",
+  "Tack & Equipment",
+  "Gaits & Riding",
+  "SAWMGA Rules & Events",
+  "Health & Care",
+  "History & Trivia",
+];
+
 function toCategoryKey(value) {
   return String(value || "")
     .trim()
@@ -1757,36 +1766,12 @@ export default function LaskaLegacy() {
 
       {/* ADMIN WMG QUIZ — list */}
       {page === "admin-quiz" && adminAuth && (
-        <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
-          <button onClick={() => navigate("admin")} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Admin</button>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 16 }}>
-            <div>
-              <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>WMG Quiz</h1>
-              <p style={{ fontSize: 13, color: BRAND.grey }}>{quizQuestions.length} question{quizQuestions.length !== 1 ? "s" : ""} {"·"} feeds the /quiz trivia ladder</p>
-            </div>
-            <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-quiz-edit", { id: "", level: 1, question: "", answer: "", stumper: false })}>{Icons.plus} Add Question</button>
-          </div>
-          {quizQuestions.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No questions yet. Add your first one above!</p>}
-          {[1, 2, 3, 4, 5].map(lvl => {
-            const levelQuestions = quizQuestions.filter(q => q.level === lvl);
-            if (levelQuestions.length === 0) return null;
-            return (
-              <div key={lvl} style={{ marginBottom: 28 }}>
-                <h3 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 14, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: BRAND.teal, marginBottom: 10 }}>Level {lvl}</h3>
-                {levelQuestions.map(q => (
-                  <div key={q.id} className="admin-row">
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{q.question}{q.stumper ? " ♦" : ""}</div>
-                      <div style={{ fontSize: 12, color: BRAND.grey }}>{q.answer}</div>
-                    </div>
-                    <button className="icon-btn" onClick={() => navigate("admin-quiz-edit", { ...q })}>{Icons.edit}</button>
-                    <button className="icon-btn" style={{ color: "#dc2626" }} onClick={() => { if (confirm("Delete this question?")) handleDeleteQuizQuestion(q.id); }}>{Icons.trash}</button>
-                  </div>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        <AdminQuizListPage
+          questions={quizQuestions}
+          onBack={() => navigate("admin")}
+          onNavigateEdit={(q) => navigate("admin-quiz-edit", q)}
+          onDelete={(id) => { if (confirm("Delete this question?")) handleDeleteQuizQuestion(id); }}
+        />
       )}
 
       {/* ADMIN WMG QUIZ — edit */}
@@ -2320,6 +2305,75 @@ function AdminStallItemEditPage({ item, onSave, onCancel, showToast, existingCat
   );
 }
 
+function AdminQuizListPage({ questions, onBack, onNavigateEdit, onDelete }) {
+  const [levelFilter, setLevelFilter] = useState("all");
+  const [topicFilter, setTopicFilter] = useState("all");
+
+  const filtered = questions.filter(q =>
+    (levelFilter === "all" || q.level === levelFilter) &&
+    (topicFilter === "all" || q.topic === topicFilter)
+  );
+
+  const pill = (active, activeColor) => ({
+    flexShrink: 0, padding: "8px 16px", borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: "pointer",
+    border: active ? "none" : `1px solid ${BRAND.greyLight}`,
+    background: active ? activeColor : BRAND.white,
+    color: active ? BRAND.white : BRAND.black,
+  });
+
+  return (
+    <div className="fade-in" style={{ maxWidth: 900, margin: "0 auto", padding: "48px 24px" }}>
+      <button onClick={onBack} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back to Admin</button>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20, flexWrap: "wrap", gap: 16 }}>
+        <div>
+          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>WMG Quiz</h1>
+          <p style={{ fontSize: 13, color: BRAND.grey }}>{filtered.length} of {questions.length} question{questions.length !== 1 ? "s" : ""} {"·"} feeds the /quiz trivia ladder</p>
+        </div>
+        <button
+          className="ll-btn ll-btn-primary ll-btn-sm"
+          onClick={() => onNavigateEdit({ id: "", level: levelFilter === "all" ? 1 : levelFilter, topic: topicFilter === "all" ? "" : topicFilter, question: "", answer: "", stumper: false })}
+        >
+          {Icons.plus} Add Question
+        </button>
+      </div>
+
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: BRAND.grey, marginBottom: 8 }}>Level</div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+          <button style={pill(levelFilter === "all", BRAND.black)} onClick={() => setLevelFilter("all")}>All Levels</button>
+          {[1, 2, 3, 4, 5].map(lvl => (
+            <button key={lvl} style={pill(levelFilter === lvl, BRAND.teal)} onClick={() => setLevelFilter(lvl)}>Level {lvl}</button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 24 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 1, textTransform: "uppercase", color: BRAND.grey, marginBottom: 8 }}>Topic</div>
+        <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4 }}>
+          <button style={pill(topicFilter === "all", BRAND.black)} onClick={() => setTopicFilter("all")}>All Topics</button>
+          {QUIZ_TOPICS.map(topic => (
+            <button key={topic} style={pill(topicFilter === topic, BRAND.purple)} onClick={() => setTopicFilter(topic)}>{topic}</button>
+          ))}
+        </div>
+      </div>
+
+      {questions.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No questions yet. Add your first one above!</p>}
+      {questions.length > 0 && filtered.length === 0 && <p style={{ color: BRAND.grey, fontSize: 15, textAlign: "center", padding: 48 }}>No questions match that filter.</p>}
+      {filtered.map(q => (
+        <div key={q.id} className="admin-row">
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{q.question}{q.stumper ? " ♦" : ""}</div>
+            <div style={{ fontSize: 12, color: BRAND.grey }}>{q.answer}</div>
+            <div style={{ fontSize: 11, color: BRAND.teal, fontWeight: 700, marginTop: 4 }}>Level {q.level}{q.topic ? ` · ${q.topic}` : ""}</div>
+          </div>
+          <button className="icon-btn" onClick={() => onNavigateEdit({ ...q })}>{Icons.edit}</button>
+          <button className="icon-btn" style={{ color: "#dc2626" }} onClick={() => onDelete(q.id)}>{Icons.trash}</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AdminQuizEditPage({ question, onSave, onCancel, showToast }) {
   const [form, setForm] = useState({ ...question });
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -2330,11 +2384,20 @@ function AdminQuizEditPage({ question, onSave, onCancel, showToast }) {
       <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 26, color: BRAND.black, fontWeight: 800, marginBottom: 24 }}>{question.id ? "Edit Question" : "Add Question"}</h1>
 
       <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-        <div>
-          <label className="ll-label">Level *</label>
-          <select className="ll-input" value={form.level} onChange={e => set("level", parseInt(e.target.value, 10))}>
-            {[1, 2, 3, 4, 5].map(lvl => <option key={lvl} value={lvl}>Level {lvl}</option>)}
-          </select>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div>
+            <label className="ll-label">Level *</label>
+            <select className="ll-input" value={form.level} onChange={e => set("level", parseInt(e.target.value, 10))}>
+              {[1, 2, 3, 4, 5].map(lvl => <option key={lvl} value={lvl}>Level {lvl}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="ll-label">Topic *</label>
+            <select className="ll-input" value={form.topic || ""} onChange={e => set("topic", e.target.value)}>
+              <option value="" disabled>Select a topic</option>
+              {QUIZ_TOPICS.map(topic => <option key={topic} value={topic}>{topic}</option>)}
+            </select>
+          </div>
         </div>
         <div><label className="ll-label">Question *</label><textarea className="ll-input" rows={3} value={form.question} onChange={e => set("question", e.target.value)} placeholder="e.g. What do you call a baby horse?" /></div>
         <div><label className="ll-label">Answer *</label><textarea className="ll-input" rows={2} value={form.answer} onChange={e => set("answer", e.target.value)} placeholder="e.g. A foal" /></div>
@@ -2345,7 +2408,7 @@ function AdminQuizEditPage({ question, onSave, onCancel, showToast }) {
       </div>
 
       <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
-        <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.question && form.answer) onSave(form); else showToast("Question and answer are required"); }}>Save Question</button>
+        <button className="ll-btn ll-btn-primary" style={{ flex: 1, justifyContent: "center" }} onClick={() => { if (form.question && form.answer && form.topic) onSave(form); else showToast("Topic, question, and answer are required"); }}>Save Question</button>
         <button className="ll-btn ll-btn-outline" onClick={onCancel}>Cancel</button>
       </div>
     </div>
