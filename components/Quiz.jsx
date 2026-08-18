@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import confetti from 'canvas-confetti';
 import { QUESTIONS, BONUS_TIEBREAKERS } from '@/lib/quizData';
 import * as db from '@/lib/supabase';
 
@@ -36,6 +37,48 @@ function pickQuestion(level, usedRef, questionsByLevel) {
   return { level, ...pool[idx] };
 }
 
+const CONFETTI_COLORS_BIG = ['#0097b2', '#5e17eb', '#facc15', '#ffffff'];
+const CONFETTI_COLORS_SMALL = ['#0097b2', '#5e17eb'];
+
+function fireConfetti(big) {
+  if (big) {
+    confetti({ particleCount: 140, spread: 90, startVelocity: 45, origin: { x: 0.2, y: 0.7 }, colors: CONFETTI_COLORS_BIG });
+    confetti({ particleCount: 140, spread: 90, startVelocity: 45, origin: { x: 0.8, y: 0.7 }, colors: CONFETTI_COLORS_BIG });
+    setTimeout(() => confetti({ particleCount: 80, spread: 100, startVelocity: 35, origin: { x: 0.5, y: 0.6 }, colors: CONFETTI_COLORS_BIG }), 200);
+  } else {
+    confetti({ particleCount: 50, spread: 65, startVelocity: 30, origin: { x: 0.5, y: 0.7 }, colors: CONFETTI_COLORS_SMALL });
+  }
+}
+
+// Small: two quick ascending notes. Big: four-note ascending arpeggio.
+function playChime(audioCtxRef, big) {
+  if (typeof window === 'undefined') return;
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass) return;
+  if (!audioCtxRef.current) audioCtxRef.current = new AudioContextClass();
+  const ctx = audioCtxRef.current;
+  if (ctx.state === 'suspended') ctx.resume();
+
+  const notes = big ? [523.25, 659.25, 783.99, 1046.5] : [523.25, 659.25];
+  const noteDuration = big ? 0.16 : 0.14;
+  const peakGain = big ? 0.22 : 0.14;
+
+  notes.forEach((freq, i) => {
+    const startAt = ctx.currentTime + i * noteDuration * 0.85;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0, startAt);
+    gain.gain.linearRampToValueAtTime(peakGain, startAt + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, startAt + noteDuration);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(startAt);
+    osc.stop(startAt + noteDuration + 0.02);
+  });
+}
+
 export default function Quiz() {
   const [screen, setScreen] = useState('start'); // start | playing | result
   const [mode, setMode] = useState('adults'); // kids (1-3) | adults (1-5)
@@ -52,6 +95,7 @@ export default function Quiz() {
   const usedRef = useRef({});
   const bonusUsedRef = useRef(new Set());
   const timerRef = useRef(null);
+  const audioCtxRef = useRef(null);
 
   const maxLevel = mode === 'kids' ? 3 : 5;
 
@@ -112,6 +156,8 @@ export default function Quiz() {
     if (currentIndex === roundQuestions.length - 1) {
       setCompletedAll(true);
       setScreen('result');
+      fireConfetti(true);
+      playChime(audioCtxRef, true);
       return;
     }
     setCurrentIndex((i) => i + 1);
@@ -121,6 +167,8 @@ export default function Quiz() {
 
   function markIncorrect() {
     setScreen('result');
+    fireConfetti(false);
+    playChime(audioCtxRef, false);
   }
 
   function pickBonus() {
