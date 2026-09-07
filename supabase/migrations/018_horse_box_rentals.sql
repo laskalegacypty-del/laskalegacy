@@ -1,10 +1,11 @@
 -- ============================================
--- Horse Box Rental — request submissions
--- Captured on the /horse-box-rental page: renter details, horse
--- transport details, and confirmation the renter agreed to the
--- rental terms & conditions.
+-- Horse Box Rental — collection-day agreement
+-- Filled in by the renter when they arrive to collect the horse box
+-- (not an advance request): renter details, horse/transport details,
+-- a collection-inspection acknowledgment, and confirmation the
+-- renter agreed to the rental terms & conditions.
 -- Public insert only (no public read) — same pattern as `messages`
--- and `quiz_entries`: visitors submit their own request, only Admin
+-- and `quiz_entries`: renters submit their own record, only Admin
 -- (client-side password gate, same as the rest of this app) lists them.
 -- Run this in your Supabase SQL Editor
 -- ============================================
@@ -20,10 +21,12 @@ CREATE TABLE IF NOT EXISTS horse_box_rentals (
   return_date DATE NOT NULL,
   destination TEXT,
   towing_vehicle_confirmed BOOLEAN NOT NULL DEFAULT false,
+  inspection_confirmed BOOLEAN NOT NULL DEFAULT false,
+  damage_notes TEXT,
   notes TEXT,
   terms_accepted BOOLEAN NOT NULL DEFAULT false,
   terms_accepted_at TIMESTAMPTZ,
-  status TEXT NOT NULL DEFAULT 'new',
+  status TEXT NOT NULL DEFAULT 'collected',
   created_at TIMESTAMPTZ DEFAULT now()
 );
 

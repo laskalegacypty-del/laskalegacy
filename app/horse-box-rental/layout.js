@@ -1,6 +1,6 @@
 export const metadata = {
-  title: 'Laska Legacy | Horse Box Rental',
-  description: 'Request to rent a horse box from Laska Legacy — fill in your details and agree to the rental terms.',
+  title: 'Laska Legacy | Horse Box Collection',
+  description: 'Completed at collection — confirm your details, inspect the horse box, and agree to the rental terms.',
   robots: { index: false, follow: false },
 };
 

@@ -22,16 +22,23 @@ const TERMS = [
   'Please inspect the horse box at collection and report any pre-existing damage to us immediately, before departing.',
 ];
 
-const emptyForm = {
-  name: '', email: '', phone: '',
-  numHorses: '1', horseDetails: '',
-  collectionDate: '', returnDate: '',
-  destination: '', towingVehicleConfirmed: false,
-  notes: '', termsAccepted: false,
-};
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function makeEmptyForm() {
+  return {
+    name: '', email: '', phone: '',
+    numHorses: '1', horseDetails: '',
+    collectionDate: todayISO(), returnDate: '',
+    destination: '', towingVehicleConfirmed: false,
+    inspectionConfirmed: false, damageNotes: '',
+    notes: '', termsAccepted: false,
+  };
+}
 
 export default function HorseBoxRental() {
-  const [form, setForm] = useState(emptyForm);
+  const [form, setForm] = useState(makeEmptyForm);
   const [errors, setErrors] = useState({});
   const [status, setStatus] = useState('form'); // form | submitting | done
   const [submitError, setSubmitError] = useState('');
@@ -48,6 +55,7 @@ export default function HorseBoxRental() {
     if (!form.returnDate) e.returnDate = true;
     if (form.collectionDate && form.returnDate && form.returnDate < form.collectionDate) e.returnDate = true;
     if (!form.towingVehicleConfirmed) e.towingVehicleConfirmed = true;
+    if (!form.inspectionConfirmed) e.inspectionConfirmed = true;
     if (!form.termsAccepted) e.termsAccepted = true;
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -68,12 +76,14 @@ export default function HorseBoxRental() {
         returnDate: form.returnDate,
         destination: form.destination.trim(),
         towingVehicleConfirmed: form.towingVehicleConfirmed,
+        inspectionConfirmed: form.inspectionConfirmed,
+        damageNotes: form.damageNotes.trim(),
         notes: form.notes.trim(),
       });
       setStatus('done');
     } catch (err) {
       console.error(err);
-      setSubmitError('Something went wrong submitting your request — please try again.');
+      setSubmitError('Something went wrong submitting the form — please try again.');
       setStatus('form');
     }
   }
@@ -96,23 +106,23 @@ export default function HorseBoxRental() {
 
       <div style={{ textAlign: 'center', padding: '32px 20px 8px' }}>
         <img src="/logo-dark.png" alt="Laska Legacy" style={{ height: 40, marginBottom: 10 }} />
-        <div style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: BRAND.teal, fontWeight: 700 }}>Horse Box Rental</div>
+        <div style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: BRAND.teal, fontWeight: 700 }}>Horse Box Collection</div>
       </div>
 
       <div style={{ maxWidth: 640, margin: '0 auto', padding: '16px 20px 80px' }}>
         {status === 'done' ? (
           <div className="hbr-in" style={{ background: BRAND.white, borderRadius: 16, padding: '40px 28px', textAlign: 'center', boxShadow: '0 12px 32px rgba(0,0,0,0.08)' }}>
             <div style={{ fontSize: 36, marginBottom: 10 }}>🐎</div>
-            <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 20, fontWeight: 800, color: BRAND.black, margin: '0 0 8px' }}>Request Received</h2>
+            <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 20, fontWeight: 800, color: BRAND.black, margin: '0 0 8px' }}>Collection Confirmed</h2>
             <p style={{ fontSize: 14, color: BRAND.grey, lineHeight: 1.6, margin: 0 }}>
-              Thanks, {form.name.split(' ')[0] || 'there'}! We’ve got your horse box rental request and will be in touch on {form.email || 'your email'} or {form.phone || 'your phone'} shortly to confirm availability and the deposit.
+              Thanks, {form.name.split(' ')[0] || 'there'} — your horse box collection is confirmed and the rental terms have been recorded against your name. Please return it by {form.returnDate || 'the agreed date'} in the same condition it was collected in. Safe travels!
             </p>
           </div>
         ) : (
           <div className="hbr-in" style={{ background: BRAND.white, borderRadius: 16, padding: '28px 24px', boxShadow: '0 12px 32px rgba(0,0,0,0.08)' }}>
-            <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 24, fontWeight: 800, color: BRAND.black, margin: '0 0 6px' }}>Rent a Horse Box</h1>
+            <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 24, fontWeight: 800, color: BRAND.black, margin: '0 0 6px' }}>Horse Box Collection Form</h1>
             <p style={{ fontSize: 13.5, color: BRAND.grey, margin: '0 0 24px', lineHeight: 1.5 }}>
-              Fill in your details below. We’ll confirm availability and get back to you to arrange collection.
+              Please complete this now, at collection, to finalise your horse box rental. Check your details, confirm the box has been inspected, and agree to the terms below before you leave with it.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 8 }}>
@@ -176,6 +186,23 @@ export default function HorseBoxRental() {
               </span>
             </label>
 
+            <label style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginTop: 14, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={form.inspectionConfirmed}
+                onChange={(e) => set('inspectionConfirmed', e.target.checked)}
+                style={{ width: 18, height: 18, flexShrink: 0, marginTop: 1, accentColor: BRAND.teal }}
+              />
+              <span style={{ fontSize: 13, color: errors.inspectionConfirmed ? BRAND.red : BRAND.black, lineHeight: 1.5 }}>
+                I have inspected the horse box today and confirm it is in good, roadworthy condition, except as noted below.
+              </span>
+            </label>
+
+            <div style={{ marginTop: 10 }}>
+              <label style={labelStyle}>Damage or Issues Noted at Collection (if any)</label>
+              <textarea style={{ ...inputStyle(false), minHeight: 60, resize: 'vertical' }} value={form.damageNotes} onChange={(e) => set('damageNotes', e.target.value)} />
+            </div>
+
             <div style={{ background: BRAND.offWhite, border: `1px solid ${BRAND.greyLight}`, borderRadius: 12, padding: '16px 18px', marginTop: 20, maxHeight: 220, overflowY: 'auto' }}>
               <div style={{ fontWeight: 800, fontSize: 13, color: BRAND.black, marginBottom: 10 }}>Rental Terms &amp; Conditions</div>
               <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -209,10 +236,10 @@ export default function HorseBoxRental() {
                 background: BRAND.black, color: BRAND.white, boxShadow: '0 10px 22px rgba(0,0,0,0.18)',
               }}
             >
-              {status === 'submitting' ? 'Submitting…' : 'Submit Request'}
+              {status === 'submitting' ? 'Confirming…' : 'Confirm & Collect'}
             </button>
             <p style={{ fontSize: 11.5, color: BRAND.grey, textAlign: 'center', marginTop: 10 }}>
-              This is a request, not a confirmed booking — we’ll be in touch to confirm availability.
+              Submitting this form confirms you’ve read and agreed to the terms above and finalises your collection.
             </p>
           </div>
         )}
