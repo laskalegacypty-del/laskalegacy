@@ -516,7 +516,7 @@ function ProductGallery({ images, name, category }) {
   );
 }
 
-export default function LaskaLegacy() {
+export default function LaskaLegacy({ initialPage = "home" }) {
   const [products, setProducts] = useState([]);
   const [messages, setMessages] = useState([]);
   const [gallery, setGallery] = useState([]);
@@ -544,7 +544,7 @@ export default function LaskaLegacy() {
   const [lightbox, setLightbox] = useState(null);
   const [lightboxList, setLightboxList] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [page, setPage] = useState("home");
+  const [page, setPage] = useState(initialPage);
   const [filter, setFilter] = useState("all");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [editProduct, setEditProduct] = useState(null);
