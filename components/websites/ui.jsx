@@ -2,7 +2,7 @@
 
 import { useId, useRef, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { BUCKET, MAX_FILE_BYTES } from '@/lib/websites/schema';
+import { BUCKET, MAX_FILE_BYTES, MAX_FILE_MB } from '@/lib/websites/schema';
 
 export const BRAND = {
   teal: '#0097b2', purple: '#5e17eb', black: '#000000', white: '#ffffff',
@@ -106,7 +106,7 @@ function typeOf(file) {
 export async function uploadImage({ submissionId, kind, file, allowed }) {
   const type = typeOf(file);
   if (!allowed.includes(type)) throw new Error(`Please choose one of: ${allowed.map((t) => t.split('/')[1].replace('svg+xml', 'svg').replace('jpeg', 'jpg')).join(', ').toUpperCase()}.`);
-  if (file.size > MAX_FILE_BYTES) throw new Error('That file is bigger than 5 MB. Please choose a smaller one.');
+  if (file.size > MAX_FILE_BYTES) throw new Error(`That file is bigger than ${MAX_FILE_MB} MB. Please choose a smaller one.`);
 
   const post = async (url, body) => {
     const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });

@@ -382,7 +382,7 @@ function StepServices({ a, up, err, submissionId }) {
           <TextField label="Name" required value={it.name} onChange={(v) => setItem(i, 'name', v)} error={err(`services.items.${i}.name`)} helper="For example 'Sourdough loaf' or 'Full car valet'." />
           <TextAreaField label="Short description" required rows={2} maxLength={200} counter="200 max" value={it.description} onChange={(v) => setItem(i, 'description', v)} error={err(`services.items.${i}.description`)} helper="One or two sentences on what the customer gets." />
           <TextField label="Price" value={it.price} onChange={(v) => setItem(i, 'price', v)} helper="Optional. For example 'R250' or 'From R250'." />
-          <ImageUpload label="Image" kind="serviceImage" allowed={PHOTO_TYPES} accept=".jpg,.jpeg,.png,.webp" submissionId={submissionId} value={it.image} onChange={(v) => setItem(i, 'image', v)} helper="Optional. JPG, PNG or WEBP, up to 5 MB." />
+          <ImageUpload label="Image" kind="serviceImage" allowed={PHOTO_TYPES} accept=".jpg,.jpeg,.png,.webp" submissionId={submissionId} value={it.image} onChange={(v) => setItem(i, 'image', v)} helper="Optional. JPG, PNG or WEBP." />
         </div>
       ))}
       {items.length < MAX_SERVICES && (
@@ -414,7 +414,7 @@ function StepBrand({ a, up, err, submissionId }) {
 
       {!b.noLogo && (
         <ImageUpload label="Logo" required kind="logo" allowed={LOGO_TYPES} accept=".png,.svg,.jpg,.jpeg,.webp" submissionId={submissionId} value={b.logo} onChange={set('logo')} error={err('brand.logo')}
-          helper="Use a high resolution logo, ideally SVG or PNG with a transparent background. PNG, SVG, JPG or WEBP, up to 5 MB." />
+          helper="Use a high resolution logo, ideally SVG or PNG with a transparent background. PNG, SVG, JPG or WEBP. SVG logos up to 2 MB, other files up to 50 MB." />
       )}
       <CheckField checked={b.noLogo} onChange={(v) => { set('noLogo')(v); if (v) set('logo')(null); }}>I do not have a logo</CheckField>
       {b.noLogo && <TextField label="Preferred name styling" value={b.nameStyling} onChange={set('nameStyling')} helper="How should we style your name in place of a logo? For example 'all capitals, bold, with a small star'." />}
@@ -500,10 +500,10 @@ function StepContent({ a, up, err, submissionId }) {
 
       <h3 style={sub}>Photos</h3>
       <p style={{ ...lead, marginBottom: 12 }}>
-        A good photo is bright, in focus, and shows your real work, products or team. Landscape (wide) photos work best for the top of the page. Phone photos are fine as long as they are sharp. JPG, PNG or WEBP, up to 5 MB each.
+        A good photo is bright, in focus, and shows your real work, products or team. Landscape (wide) photos work best for the top of the page. Phone photos are fine as long as they are sharp. Upload your best, full quality photos straight from your camera or phone (JPG, PNG or WEBP, up to 50 MB each). We resize them for the website, so bigger is better.
       </p>
       <ImageUpload label="Hero image (1)" kind="hero" allowed={PHOTO_TYPES} accept=".jpg,.jpeg,.png,.webp" submissionId={submissionId} value={c.heroImage} onChange={set('heroImage')} helper="The big picture at the top of your site." />
-      <GalleryUpload label={`Gallery images (up to ${MAX_GALLERY})`} kind="gallery" allowed={PHOTO_TYPES} accept=".jpg,.jpeg,.png,.webp" submissionId={submissionId} values={c.galleryImages} onChange={set('galleryImages')} max={MAX_GALLERY} helper="Your work, products, premises or happy customers." error={err('content.galleryImages')} />
+      <GalleryUpload label="Gallery images" kind="gallery" allowed={PHOTO_TYPES} accept=".jpg,.jpeg,.png,.webp" submissionId={submissionId} values={c.galleryImages} onChange={set('galleryImages')} max={MAX_GALLERY} helper="Your work, products, premises or happy customers." error={err('content.galleryImages')} />
       <ImageUpload label="Team photo" kind="team" allowed={PHOTO_TYPES} accept=".jpg,.jpeg,.png,.webp" submissionId={submissionId} value={c.teamPhoto} onChange={set('teamPhoto')} helper="Optional. People like to see who they are dealing with." />
       <CheckField checked={c.useStock} onChange={set('useStock')}>Please use stock images where I have none</CheckField>
     </>

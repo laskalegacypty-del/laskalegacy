@@ -6,7 +6,7 @@ ready to paste Claude Code prompt plus a `settings.json` for the future design s
 ## How it works
 
 1. Client opens `/websites` (linked as **Websites** in the main nav) and completes the wizard. Progress autosaves in their browser.
-2. Images upload straight to Supabase Storage through a server issued signed URL, then the server inspects the real bytes (PNG, JPG, WEBP, or SVG for logos only; max 5 MB; scripts in SVGs are rejected).
+2. Images upload straight to Supabase Storage through a server issued signed URL, then the server inspects the real bytes (PNG, JPG, WEBP, or SVG for logos only; max 50 MB per photo, SVG logos max 2 MB; scripts in SVGs are rejected).
 3. On submit, `POST /api/websites/submit` validates everything again, rate limits (5 per hour per IP), checks the honeypot, builds `settings_json` and `generated_prompt`, saves the row, and sends two emails (client confirmation, owner notification).
 4. The client sees **Pay R500 to start** (PayFast). PayFast calls `/api/websites/payfast/notify` (ITN), which marks `payment_status = paid` only after the signature, amount, and PayFast's own server confirmation all check out.
 5. You open the shop **Admin**, then **Website Briefs**, open a brief, and use **Download .md for Claude Code**, **Copy prompt** or **Download all assets (zip)**. Do not start work on unpaid briefs.
@@ -60,6 +60,7 @@ Push the branch, merge, and Vercel deploys as normal. Add the env vars above to 
 Sample output: [`docs/website-intake-sample-prompt.md`](docs/website-intake-sample-prompt.md).
 
 ## Notes and limits
+- Photos can be up to **50 MB** each (the Supabase free plan ceiling) and a gallery can hold up to 50. Only the first 4 KB of each photo is inspected, so big files are cheap to check. Big originals use up the free **1 GB** of Supabase storage quickly; watch usage and upgrade the plan (then raise `MAX_FILE_MB` in `lib/websites/schema.js` and the bucket limit) if needed.
 - Uploaded files are in a **public-read** bucket under random UUID folders with no listing, so URLs in the prompt keep working for the built site. Anyone with the exact URL can view the file.
 - Files uploaded by someone who never submits are orphaned in storage. Clear out folders whose id is not in `website_submissions` occasionally.
 - `website_rate_limits` grows over time. Safe to delete rows older than a day.

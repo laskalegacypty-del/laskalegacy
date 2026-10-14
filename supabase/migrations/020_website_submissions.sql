@@ -52,7 +52,7 @@ ALTER TABLE website_rate_limits ENABLE ROW LEVEL SECURITY;
 -- Uploads happen only through /api/websites/upload (service role), which checks type and size.
 INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
 VALUES (
-  'website-assets', 'website-assets', true, 5242880,
+  'website-assets', 'website-assets', true, 52428800,
   ARRAY['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
 )
 ON CONFLICT (id) DO UPDATE
