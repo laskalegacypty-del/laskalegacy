@@ -38,7 +38,26 @@ export default function RichTextEditor({ value, onChange, onUploadImage, showToa
     return () => document.removeEventListener('selectionchange', onSel);
   }, []);
 
+  // Keep the text you are typing inside the visible part of the scrolling box.
+  const followCaret = () => {
+    const box = ref.current;
+    const sel = window.getSelection();
+    if (!box || !sel || !sel.rangeCount || !box.contains(sel.anchorNode)) return;
+    const range = sel.getRangeAt(0);
+    let rect = range.getClientRects()[0];
+    if (!rect || (!rect.height && !rect.width)) {
+      const el = sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement;
+      rect = el && el !== box ? el.getBoundingClientRect() : null;
+    }
+    if (!rect) return;
+    const b = box.getBoundingClientRect();
+    const pad = 24;
+    if (rect.bottom > b.bottom - pad) box.scrollTop += rect.bottom - b.bottom + pad;
+    else if (rect.top < b.top + pad) box.scrollTop -= b.top + pad - rect.top;
+  };
+
   const emit = () => {
+    setTimeout(followCaret, 0);
     const html = ref.current.innerHTML;
     const clean = html === '<br>' ? '' : html;
     lastEmitted.current = clean;
@@ -111,7 +130,7 @@ export default function RichTextEditor({ value, onChange, onUploadImage, showToa
     <div style={{ border: `1px solid ${C.line}`, borderRadius: 10, background: C.white, overflow: 'hidden' }}>
       <style dangerouslySetInnerHTML={{ __html: `
         .rte-area:empty::before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; }
-        .rte-area { min-height: 320px; padding: 18px 20px; outline: none; font-size: 16px; line-height: 1.75; color: #374151; }
+        .rte-area { height: clamp(320px, 65vh, 720px); min-height: 200px; max-height: 90vh; overflow-y: auto; overflow-x: hidden; resize: vertical; overflow-wrap: anywhere; word-break: break-word; padding: 18px 20px; outline: none; font-size: 16px; line-height: 1.75; color: #374151; scrollbar-width: thin; }
         .rte-area h1 { font-family: Montserrat, sans-serif; font-size: 30px; font-weight: 800; margin: 18px 0 10px; color: #000 }
         .rte-area h2 { font-family: Montserrat, sans-serif; font-size: 24px; font-weight: 800; margin: 18px 0 10px; color: #000 }
         .rte-area h3 { font-family: Montserrat, sans-serif; font-size: 19px; font-weight: 700; margin: 16px 0 8px; color: #000 }
@@ -121,7 +140,7 @@ export default function RichTextEditor({ value, onChange, onUploadImage, showToa
         .rte-area a { color: #0097b2; text-decoration: underline }
         .rte-area ul, .rte-area ol { padding-left: 26px; margin: 0 0 14px }
         .rte-area hr { border: none; border-top: 2px solid #e5e7eb; margin: 22px 0 }
-        .rte-bar { position: sticky; top: 68px; z-index: 5 }
+        .rte-area * { max-width: 100%; }
       ` }} />
 
       <div className="rte-bar" style={{ display: 'flex', flexWrap: 'wrap', gap: 3, alignItems: 'center', padding: 8, background: '#f9fafb', borderBottom: `1px solid ${C.line}` }}>
