@@ -2,6 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import * as db from "@/lib/supabase";
 import { uploadImage, deleteImage, isImageFile } from "@/lib/supabase";
 import WebsitesPromo from "@/components/WebsitesPromo";
+import BlogPostView from "@/components/BlogPostView";
+import dynamic from "next/dynamic";
+import { formatPostDate, excerptOf, readingMinutes, sanitizeHtml, bodyToSafeHtml } from "@/lib/richtext";
+
+const RichTextEditor = dynamic(() => import("@/components/RichTextEditor"), { ssr: false, loading: () => <div style={{ minHeight: 320, border: "1px solid #e5e7eb", borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center", color: "#6b7280", fontSize: 13 }}>Loading editor…</div> });
 import { TAB_PATHS, PATH_TABS } from "@/lib/tabs";
 import AdminWebsites from "@/components/AdminWebsites";
 
@@ -517,12 +522,15 @@ function ProductGallery({ images, name, category }) {
   );
 }
 
-export default function LaskaLegacy({ initialPage = "home" }) {
+export default function LaskaLegacy({ initialPage = "home", initialPostId = null }) {
+  const [blogPostsLoaded, setBlogPostsLoaded] = useState(false);
+  const blogPostsRef = useRef([]);
   const [products, setProducts] = useState([]);
   const [messages, setMessages] = useState([]);
   const [gallery, setGallery] = useState([]);
   const [orders, setOrders] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
+  blogPostsRef.current = blogPosts; // always current, for the browser Back handler
   const [horses, setHorses] = useState([]);
   const [selectedHorse, setSelectedHorse] = useState(null);
   const [editHorse, setEditHorse] = useState(null);
@@ -642,6 +650,9 @@ export default function LaskaLegacy({ initialPage = "home" }) {
         setGallery(gal);
         setOrders(ords);
         setBlogPosts(posts);
+        blogPostsRef.current = posts;
+        setBlogPostsLoaded(true);
+        if (initialPostId) setSelectedPost(posts.find(p => p.id === initialPostId) || null);
         setHorses(hrs);
         setStallItems(stallItms);
         setStallEvents(stallEvts);
@@ -652,6 +663,7 @@ export default function LaskaLegacy({ initialPage = "home" }) {
         setQuizEntries(quizEntriesList);
       } catch (err) {
         console.error("Failed to load site data:", err);
+        setBlogPostsLoaded(true);
       } finally {
         clearTimeout(maxWait);
         finishLoading();
@@ -731,13 +743,24 @@ export default function LaskaLegacy({ initialPage = "home" }) {
     if (tabPath && typeof window !== "undefined" && window.location.pathname !== tabPath) {
       window.history.pushState(null, "", tabPath);
     }
+    // Each blog post has its own shareable link.
+    if (p === "blog-post" && data?.id && typeof window !== "undefined") {
+      window.history.pushState(null, "", `/blog/${data.id}`);
+    }
     window.scrollTo?.({ top: 0 });
   };
 
   // Browser Back/Forward between tab URLs.
   useEffect(() => {
     const onPop = () => {
-      const tab = PATH_TABS[window.location.pathname.replace(/\/$/, "") || "/"];
+      const path = window.location.pathname.replace(/\/$/, "") || "/";
+      const postMatch = path.match(/^\/blog\/([^/]+)$/);
+      if (postMatch) {
+        setSelectedPost(blogPostsRef.current.find(p => p.id === postMatch[1]) || null);
+        setPage("blog-post"); setMobileMenu(false); window.scrollTo?.({ top: 0 });
+        return;
+      }
+      const tab = PATH_TABS[path];
       if (tab) { setPage(tab); setMobileMenu(false); window.scrollTo?.({ top: 0 }); }
     };
     window.addEventListener("popstate", onPop);
@@ -790,7 +813,7 @@ export default function LaskaLegacy({ initialPage = "home" }) {
     showToast("Order deleted");
   };
   const handleSavePost = async (post) => {
-    const saved = await db.saveBlogPost(post);
+    const saved = await db.saveBlogPost({ ...post, body: sanitizeHtml(post.body || "") });
     if (post.id) {
       setBlogPosts(blogPosts.map(p => p.id === saved.id ? saved : p));
     } else {
@@ -1465,9 +1488,9 @@ export default function LaskaLegacy({ initialPage = "home" }) {
                     </div>
                   )}
                   <div style={{ padding: post.coverImage ? "24px 24px 24px 0" : "24px", display: "flex", flexDirection: "column", justifyContent: "center" }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 8 }}>{new Date(post.date).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}</div>
+                    <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 8 }}>{[formatPostDate(post.date), `${readingMinutes(post.body)} min read`].filter(Boolean).join("  ·  ")}</div>
                     <h2 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 22, fontWeight: 800, color: BRAND.black, marginBottom: 8, lineHeight: 1.3 }}>{post.title}</h2>
-                    <p style={{ fontSize: 14, color: BRAND.grey, lineHeight: 1.7 }}>{(post.excerpt || post.body?.replace(/<[^>]*>/g, "")?.slice(0, 160) || "") + "\u2026"}</p>
+                    <p style={{ fontSize: 14, color: BRAND.grey, lineHeight: 1.7 }}>{excerptOf(post, 170)}</p>
                     <div style={{ marginTop: 12, fontSize: 13, fontWeight: 700, color: BRAND.teal }}>Read more {"\u2192"}</div>
                   </div>
                 </article>
@@ -1480,53 +1503,10 @@ export default function LaskaLegacy({ initialPage = "home" }) {
 
       {/* BLOG POST */}
       {page === "blog-post" && selectedPost && (
-        <div className="fade-in" style={{ maxWidth: 760, margin: "0 auto", padding: "48px 24px 80px" }}>
-          <button onClick={() => navigate("blog")} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 32 }}>{Icons.back} Back to Blog</button>
-
-          {selectedPost.coverImage && (
-            <div style={{ borderRadius: 12, overflow: "hidden", marginBottom: 32, aspectRatio: "16/7", background: BRAND.offWhite }}>
-              <img src={selectedPost.coverImage} alt={selectedPost.title} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-            </div>
-          )}
-
-          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase", color: BRAND.teal, marginBottom: 10 }}>{new Date(selectedPost.date).toLocaleDateString("en-ZA", { day: "numeric", month: "long", year: "numeric" })}</div>
-          <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "clamp(28px, 5vw, 40px)", fontWeight: 900, color: BRAND.black, lineHeight: 1.2, marginBottom: 24 }}>{selectedPost.title}</h1>
-
-          {/* Render body content */}
-          <div style={{ fontSize: 15, lineHeight: 1.9, color: "#374151" }}>
-            {(selectedPost.body || "").split("\n").map((block, i) => {
-              const trimmed = block.trim();
-              if (!trimmed) return <br key={i} />;
-              if (trimmed.startsWith("## ")) return <h2 key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 22, fontWeight: 800, color: BRAND.black, margin: "32px 0 12px" }}>{trimmed.slice(3)}</h2>;
-              if (trimmed.startsWith("# ")) return <h2 key={i} style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 24, fontWeight: 800, color: BRAND.black, margin: "32px 0 12px" }}>{trimmed.slice(2)}</h2>;
-              return <p key={i} style={{ marginBottom: 16 }}>{trimmed}</p>;
-            })}
-          </div>
-
-          {/* Inline images */}
-          {selectedPost.images && selectedPost.images.length > 0 && (
-            <div style={{ display: "grid", gridTemplateColumns: selectedPost.images.length === 1 ? "1fr" : "repeat(auto-fill, minmax(280px, 1fr))", gap: 16, margin: "32px 0" }}>
-              {selectedPost.images.map((img, i) => (
-                <div key={i} style={{ borderRadius: 10, overflow: "hidden", cursor: "pointer", background: BRAND.offWhite }} onClick={() => setLightbox({ src: img, caption: "" })}>
-                  <img src={img} alt={`Post image ${i + 1}`} style={{ width: "100%", display: "block" }} />
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Embedded videos */}
-          {selectedPost.videos && selectedPost.videos.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 20, margin: "32px 0" }}>
-              {selectedPost.videos.map((url, i) => {
-                const ytMatch = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/);
-                if (ytMatch) return <div key={i} style={{ position: "relative", paddingBottom: "56.25%", borderRadius: 10, overflow: "hidden", background: BRAND.black }}><iframe src={`https://www.youtube.com/embed/${ytMatch[1]}`} style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }} allowFullScreen /></div>;
-                const tkMatch = url.match(/tiktok\.com\/@[^/]+\/video\/(\d+)/);
-                if (tkMatch) return <div key={i} style={{ borderRadius: 10, overflow: "hidden", background: BRAND.offWhite, padding: 16, textAlign: "center" }}><a href={url} target="_blank" rel="noopener noreferrer" style={{ color: BRAND.teal, fontWeight: 700, fontSize: 14 }}>Watch on TikTok {"\u2192"}</a></div>;
-                return <div key={i} style={{ borderRadius: 10, overflow: "hidden", background: BRAND.offWhite, padding: 16, textAlign: "center" }}><a href={url} target="_blank" rel="noopener noreferrer" style={{ color: BRAND.teal, fontWeight: 700, fontSize: 14 }}>Watch video {"\u2192"}</a></div>;
-              })}
-            </div>
-          )}
-        </div>
+        <BlogPostView post={selectedPost} posts={blogPosts} onBack={() => navigate("blog")} onOpen={(p) => navigate("blog-post", p)} onLightbox={setLightbox} />
+      )}
+      {page === "blog-post" && !selectedPost && (
+        <div style={{ textAlign: "center", padding: "120px 24px", color: BRAND.grey, fontSize: 14 }}>{blogPostsLoaded ? "We could not find that post." : "Loading post…"}</div>
       )}
 
       {/* ADMIN AUTH */}
@@ -1668,7 +1648,7 @@ export default function LaskaLegacy({ initialPage = "home" }) {
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{post.title}</div>
-                <div style={{ fontSize: 12, color: BRAND.grey }}>{new Date(post.date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })} {"\u00B7"} {post.images?.length || 0} photo{(post.images?.length || 0) !== 1 ? "s" : ""} {"\u00B7"} {post.videos?.length || 0} video{(post.videos?.length || 0) !== 1 ? "s" : ""}</div>
+                <div style={{ fontSize: 12, color: BRAND.grey }}>{formatPostDate(post.date, { day: "numeric", month: "short", year: "numeric" }) || "No date"} {"·"} {post.images?.length || 0} photo{(post.images?.length || 0) !== 1 ? "s" : ""} {"\u00B7"} {post.videos?.length || 0} video{(post.videos?.length || 0) !== 1 ? "s" : ""}</div>
               </div>
               <button className="icon-btn" onClick={e => { e.stopPropagation(); navigate("admin-blog-edit", { ...post }); }}>{Icons.edit}</button>
               <button className="icon-btn" style={{ color: "#dc2626" }} onClick={e => { e.stopPropagation(); if (confirm("Delete \"" + post.title + "\"?")) handleDeletePost(post.id); }}>{Icons.trash}</button>
@@ -3677,7 +3657,7 @@ function BlogEditPage({ post, onSave, onCancel, showToast }) {
   const removeVideo = (i) => setForm(f => ({ ...f, videos: f.videos.filter((_, idx) => idx !== i) }));
 
   return (
-    <div className="fade-in" style={{ maxWidth: 720, margin: "0 auto", padding: "48px 24px 80px" }}>
+    <div className="fade-in" style={{ maxWidth: 880, margin: "0 auto", padding: "48px 24px 80px" }}>
       <button onClick={onCancel} style={{ display: "flex", alignItems: "center", gap: 8, background: "none", border: "none", cursor: "pointer", color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 24 }}>{Icons.back} Back</button>
       <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800, marginBottom: 32 }}>{form.id ? "Edit Post" : "New Post"}</h1>
 
@@ -3716,8 +3696,9 @@ function BlogEditPage({ post, onSave, onCancel, showToast }) {
         {/* Body */}
         <div>
           <label className="ll-label">Post Content</label>
-          <p style={{ fontSize: 11, color: BRAND.grey, marginBottom: 8 }}>Write your post. Use # or ## at the start of a line for headings. Blank lines create paragraph breaks.</p>
-          <textarea className="ll-input" value={form.body || ""} onChange={e => set("body", e.target.value)} placeholder={"Start writing your post here...\n\n## A Subheading\n\nMore content here..."} style={{ minHeight: 280, fontFamily: "'Inter', sans-serif", fontSize: 14, lineHeight: 1.7 }} />
+          <p style={{ fontSize: 11, color: BRAND.grey, marginBottom: 8 }}>Select text, then use the toolbar to change the font, size, colour, bold, italic, alignment, lists, links and pictures.</p>
+          <RichTextEditor value={form.body || ""} onChange={html => set("body", html)} showToast={showToast}
+            onUploadImage={async (file) => { if (!isImageFile(file)) throw new Error("Choose an image file (JPG, PNG, WebP, etc.)"); return uploadImage("blog", await optimizeImageForUpload(file)); }} />
         </div>
 
         {/* Post Images */}
