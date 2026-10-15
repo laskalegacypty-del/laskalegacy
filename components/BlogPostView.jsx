@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { bodyToSafeHtml, excerptOf, formatPostDate, readingMinutes } from '@/lib/richtext';
+import { postPath } from '@/lib/blogSlug';
 
 const C = { teal: '#0097b2', purple: '#5e17eb', black: '#000', grey: '#6b7280', line: '#e5e7eb', off: '#f7f8fa' };
 
@@ -51,7 +52,7 @@ export default function BlogPostView({ post, posts = [], onBack, onOpen, onLight
   const mins = readingMinutes(post.body);
   const more = useMemo(() => posts.filter((p) => p.id !== post.id).slice(0, 3), [posts, post.id]);
 
-  const url = typeof window !== 'undefined' ? `${window.location.origin}/blog/${post.id}` : `https://www.laskalegacy.co.za/blog/${post.id}`;
+  const url = typeof window !== 'undefined' ? `${window.location.origin}${postPath(post)}` : `https://www.laskalegacy.co.za${postPath(post)}`;
   const shareText = `${post.title} | Laska Legacy`;
 
   const copy = async () => {

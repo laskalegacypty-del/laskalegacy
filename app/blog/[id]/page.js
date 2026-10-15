@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import Post from './Post';
+import { parsePostRef, postPath } from '@/lib/blogSlug';
 
 // Rendered on demand so a new post is shareable the moment it is published,
 // and the link preview (WhatsApp, Facebook) shows the post's own title, summary and cover photo.
@@ -7,9 +8,16 @@ export const dynamic = 'force-dynamic';
 
 const SITE = 'https://www.laskalegacy.co.za';
 
-async function loadPost(id) {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+async function loadPost(ref) {
+  const parsed = parsePostRef(ref);
+  if (!parsed) return null;
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  let id = parsed.id;
+  if (!id) {
+    const { data: ids } = await supabase.from('blog_posts').select('id');
+    id = ids?.find((r) => String(r.id).startsWith(parsed.short))?.id;
+    if (!id) return null;
+  }
   const { data } = await supabase.from('blog_posts').select('id, title, excerpt, body, cover_image').eq('id', id).maybeSingle();
   return data;
 }
@@ -21,7 +29,7 @@ export async function generateMetadata({ params }) {
   if (!post) return { title: 'Laska Legacy | Blog' };
   const description = (post.excerpt || plain(post.body)).slice(0, 180);
   const title = `${post.title} | Laska Legacy`;
-  const url = `${SITE}/blog/${post.id}`;
+  const url = `${SITE}${postPath(post)}`;
   return {
     title,
     description,
