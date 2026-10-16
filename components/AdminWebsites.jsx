@@ -111,7 +111,7 @@ export default function AdminWebsites({ password, onBack, showToast }) {
 
   return (
     <div className="fade-in" style={{ maxWidth: 900, margin: '0 auto', padding: '48px 24px' }}>
-      <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 24 }}>← Back to Admin</button>
+      <button onClick={onBack} style={{ background: 'none', border: 'none', cursor: 'pointer', color: BRAND.grey, fontSize: 13, fontWeight: 700, letterSpacing: 1.5, textTransform: 'uppercase', marginBottom: 24 }}>← Back to Dashboard</button>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 12, marginBottom: 20 }}>
         <div>
           <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800, margin: 0 }}>Website Briefs</h1>

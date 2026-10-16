@@ -6,6 +6,8 @@ import * as payfastInit from '@/lib/websites/routes/payfast-init';
 import * as payfastNotify from '@/lib/websites/routes/payfast-notify';
 import * as adminList from '@/lib/websites/routes/admin-list';
 import * as adminItem from '@/lib/websites/routes/admin-item';
+import * as trainingList from '@/lib/websites/routes/training-list';
+import * as trainingItem from '@/lib/websites/routes/training-item';
 
 export const runtime = 'nodejs';
 
@@ -19,6 +21,7 @@ const FIXED = {
   'payfast/init': payfastInit,
   'payfast/notify': payfastNotify,
   'admin/list': adminList,
+  'training/list': trainingList,
 };
 
 function dispatch(method) {
@@ -28,6 +31,9 @@ function dispatch(method) {
     let ctx = { params: {} };
     if (!mod && params.path?.length === 2 && params.path[0] === 'admin') {
       mod = adminItem;
+      ctx = { params: { id: params.path[1] } };
+    } else if (!mod && params.path?.length === 2 && params.path[0] === 'training') {
+      mod = trainingItem;
       ctx = { params: { id: params.path[1] } };
     }
     const handler = mod?.[method];

@@ -501,7 +501,7 @@ export default function TrainingAgreement() {
 }
 
 // Read-only signed copy shown after submission (printable).
-function SignedCopy({ form, signature, signedAt }) {
+export function SignedCopy({ form, signature, signedAt, approvedAt }) {
   const line = { fontSize: 13, color: '#374151', lineHeight: 1.7, margin: 0 };
   const h = { fontFamily: "'Montserrat', sans-serif", fontSize: 14, fontWeight: 800, color: BRAND.black, margin: '18px 0 6px' };
   return (
@@ -542,7 +542,7 @@ function SignedCopy({ form, signature, signedAt }) {
           <p style={{ ...line, fontWeight: 700 }}>Trainer</p>
           <div style={{ height: 70, borderBottom: '1px solid #9ca3af', marginBottom: 4 }} />
           <p style={line}>{TRAINER}</p>
-          <p style={line}>Date: ______________</p>
+          <p style={line}>{approvedAt ? `Approved ${approvedAt.toLocaleString('en-ZA', { dateStyle: 'long', timeStyle: 'short' })}` : 'Date: ______________'}</p>
         </div>
       </div>
       <p style={{ fontSize: 11, color: BRAND.grey, marginTop: 14 }}>Agreement version {CONTRACT_VERSION}</p>
