@@ -19,9 +19,10 @@ const styles = StyleSheet.create({
   headerCell: { padding: 8, fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#ffffff' },
   row: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: GREY_LIGHT },
   cell: { padding: 8, fontSize: 10 },
-  colItem: { width: '40%' },
-  colQty: { width: '20%', textAlign: 'center' },
-  colPrice: { width: '20%', textAlign: 'center' },
+  colItem: { width: '32%' },
+  colQty: { width: '16%', textAlign: 'center' },
+  colPrice: { width: '16%', textAlign: 'center' },
+  colDisc: { width: '16%', textAlign: 'center' },
   colTotal: { width: '20%', textAlign: 'center' },
   totalRow: { flexDirection: 'row', borderTopWidth: 1, borderTopColor: GREY_LIGHT },
   totalLabelCell: { width: '80%', backgroundColor: TEAL, padding: 8, justifyContent: 'center' },
@@ -73,6 +74,7 @@ export default function InvoiceDocument({ invoiceNumber, items, total, logoDataU
             <Text style={[styles.headerCell, styles.colItem]}>Item</Text>
             <Text style={[styles.headerCell, styles.colQty]}>Quantity</Text>
             <Text style={[styles.headerCell, styles.colPrice]}>Price</Text>
+            <Text style={[styles.headerCell, styles.colDisc]}>Discount</Text>
             <Text style={[styles.headerCell, styles.colTotal]}>Total</Text>
           </View>
           {items.map((it, i) => (
@@ -80,7 +82,8 @@ export default function InvoiceDocument({ invoiceNumber, items, total, logoDataU
               <Text style={[styles.cell, styles.colItem]}>{it.name}</Text>
               <Text style={[styles.cell, styles.colQty]}>{it.quantity}</Text>
               <Text style={[styles.cell, styles.colPrice]}>{it.price}</Text>
-              <Text style={[styles.cell, styles.colTotal]}>{it.quantity * it.price}</Text>
+              <Text style={[styles.cell, styles.colDisc]}>{it.discount ? `${it.discount}%` : '-'}</Text>
+              <Text style={[styles.cell, styles.colTotal]}>{Math.round(it.quantity * it.price * (1 - (it.discount || 0) / 100) * 100) / 100}</Text>
             </View>
           ))}
           <View style={styles.totalRow}>

@@ -11,6 +11,12 @@ const BRAND = {
 
 function parsePrice(s) { return parseFloat(String(s || "0").replace(/[^0-9.]/g, "")) || 0; }
 
+function lineTotal(it) {
+  const gross = it.quantity * it.price;
+  const d = Math.min(100, Math.max(0, Number(it.discount) || 0));
+  return gross * (1 - d / 100);
+}
+
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -106,7 +112,7 @@ export default function InvoicePage() {
   }, [search, catalog]);
 
   const addItem = (name, price) => {
-    setItems(prev => [...prev, { name, quantity: 1, price }]);
+    setItems(prev => [...prev, { name, quantity: 1, price, discount: 0 }]);
     setSearch("");
   };
   const addCustomItem = () => {
@@ -116,7 +122,7 @@ export default function InvoicePage() {
   const updateItem = (i, patch) => setItems(prev => prev.map((it, idx) => idx === i ? { ...it, ...patch } : it));
   const removeItem = (i) => setItems(prev => prev.filter((_, idx) => idx !== i));
 
-  const total = items.reduce((s, it) => s + it.quantity * it.price, 0);
+  const total = items.reduce((s, it) => s + lineTotal(it), 0);
 
   const buildAndDownload = async (invoiceNumber, invoiceItems, invoiceTotal, invoiceDate, customer = {}) => {
     const [{ pdf }, { default: InvoiceDocument }, logoDataUrl] = await Promise.all([
@@ -292,9 +298,17 @@ export default function InvoicePage() {
                       style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: `1px solid ${BRAND.greyLight}`, fontSize: 14, boxSizing: "border-box" }}
                     />
                   </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 10, color: BRAND.grey, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>% Discount</div>
+                    <input
+                      type="number" min="0" max="100" value={it.discount || 0}
+                      onChange={e => updateItem(i, { discount: Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)) })}
+                      style={{ width: "100%", padding: "8px 10px", borderRadius: 6, border: `1px solid ${BRAND.greyLight}`, fontSize: 14, boxSizing: "border-box" }}
+                    />
+                  </div>
                   <div style={{ flex: 1, textAlign: "right" }}>
                     <div style={{ fontSize: 10, color: BRAND.grey, textTransform: "uppercase", letterSpacing: 0.5, marginBottom: 2 }}>Total</div>
-                    <div style={{ fontWeight: 800, color: BRAND.purple, fontSize: 15 }}>{formatZAR(it.quantity * it.price)}</div>
+                    <div style={{ fontWeight: 800, color: BRAND.purple, fontSize: 15 }}>{formatZAR(lineTotal(it))}</div>
                   </div>
                 </div>
               </div>
