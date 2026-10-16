@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import * as db from '@/lib/supabase';
+import { lineTotal, formatZAR, buildAndDownloadInvoicePdf } from '@/lib/invoicePdf';
 
 const BRAND = {
   teal: "#0097b2", purple: "#5e17eb", black: "#000000", white: "#ffffff",
@@ -11,53 +12,9 @@ const BRAND = {
 
 function parsePrice(s) { return parseFloat(String(s || "0").replace(/[^0-9.]/g, "")) || 0; }
 
-function lineTotal(it) {
-  const gross = it.quantity * it.price;
-  const d = Math.min(100, Math.max(0, Number(it.discount) || 0));
-  return gross * (1 - d / 100);
-}
-
 function todayISO() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
-
-function filenameDate(isoDate) {
-  const [y, m, d] = isoDate.split("-");
-  return `${d}${m}${y}`;
-}
-
-function formatZAR(n) {
-  return "R" + (Math.round(n * 100) / 100).toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-// Downscales the source logo (1024x1024) to a small square before embedding
-// it in the PDF — it only ever renders at ~64pt there, so keeping the file
-// full-res just bloats the invoice for no visual gain.
-async function logoToDataUrl(url, maxDimension = 240) {
-  const res = await fetch(url);
-  const blob = await res.blob();
-  const bitmap = await createImageBitmap(blob);
-  const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
-  const width = Math.max(1, Math.round(bitmap.width * scale));
-  const height = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(bitmap, 0, 0, width, height);
-  return canvas.toDataURL("image/png");
-}
-
-function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
 
 export default function InvoicePage() {
@@ -124,25 +81,7 @@ export default function InvoicePage() {
 
   const total = items.reduce((s, it) => s + lineTotal(it), 0);
 
-  const buildAndDownload = async (invoiceNumber, invoiceItems, invoiceTotal, invoiceDate, customer = {}) => {
-    const [{ pdf }, { default: InvoiceDocument }, logoDataUrl] = await Promise.all([
-      import("@react-pdf/renderer"),
-      import("./InvoiceDocument"),
-      logoToDataUrl("/logo-icon.png"),
-    ]);
-    const blob = await pdf(
-      <InvoiceDocument
-        invoiceNumber={invoiceNumber}
-        items={invoiceItems}
-        total={invoiceTotal}
-        logoDataUrl={logoDataUrl}
-        customerName={customer.name}
-        customerPhone={customer.phone}
-        customerEmail={customer.email}
-      />
-    ).toBlob();
-    downloadBlob(blob, `LL_INV${invoiceNumber}_${filenameDate(invoiceDate)}.pdf`);
-  };
+  const buildAndDownload = buildAndDownloadInvoicePdf;
 
   const resetBuilder = () => {
     setItems([]);
@@ -195,6 +134,16 @@ export default function InvoicePage() {
       showToast("Couldn't re-download that invoice");
     }
     setRedownloadingId(null);
+  };
+
+  const handleCopyLink = async (inv) => {
+    const url = `${window.location.origin}/i/${inv.share_token}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast(`Link for Invoice #${inv.invoice_number} copied`);
+    } catch {
+      window.prompt("Copy this link:", url);
+    }
   };
 
   const handleEditInvoice = (inv) => {
@@ -377,7 +326,15 @@ export default function InvoicePage() {
                       {new Date(inv.invoice_date).toLocaleDateString("en-ZA", { day: "numeric", month: "short", year: "numeric" })} {"·"} {formatZAR(inv.total)} {"·"} {(inv.items || []).length} item{(inv.items || []).length !== 1 ? "s" : ""}
                     </div>
                   </div>
-                  <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    {inv.share_token && (
+                      <button
+                        onClick={() => handleCopyLink(inv)}
+                        style={{ padding: "8px 14px", borderRadius: 100, border: `1px solid ${BRAND.purple}`, background: BRAND.white, color: BRAND.purple, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
+                      >
+                        Copy link
+                      </button>
+                    )}
                     <button
                       onClick={() => handleEditInvoice(inv)}
                       style={{ padding: "8px 14px", borderRadius: 100, border: `1px solid ${BRAND.greyLight}`, background: BRAND.white, color: BRAND.black, fontSize: 12, fontWeight: 700, cursor: "pointer" }}
