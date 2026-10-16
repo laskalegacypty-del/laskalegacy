@@ -342,9 +342,13 @@ export default function TrainingAgreement() {
         }
       `}</style>
 
-      <div className="ta-noprint" style={{ textAlign: 'center', padding: '32px 20px 8px' }}>
-        <img src="/logo-dark.png" alt="Laska Legacy" style={{ height: 40, marginBottom: 10 }} />
-        <div style={{ fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', color: BRAND.teal, fontWeight: 700 }}>Training Agreement</div>
+      <div className="ta-noprint" style={{ background: BRAND.black, color: BRAND.white, textAlign: 'center', padding: '40px 20px 34px', borderBottom: `5px solid ${BRAND.teal}`, backgroundImage: `linear-gradient(135deg, #000 55%, ${BRAND.purple}55 100%)` }}>
+        <img src="/logo-icon.png" alt="Laska Legacy" style={{ display: 'block', margin: '0 auto 14px', height: 96, width: 96, borderRadius: '50%', boxShadow: '0 0 0 4px rgba(255,255,255,0.15)' }} />
+        <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 30, fontWeight: 800, letterSpacing: 6, textTransform: 'uppercase', lineHeight: 1.1 }}>Laska Legacy</div>
+        <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 14, fontStyle: 'italic', color: '#7fdcec', margin: '10px 0 16px', letterSpacing: 0.5 }}>More than a horse, a lasting legacy</div>
+        <div style={{ display: 'inline-block', fontSize: 11, letterSpacing: 3, textTransform: 'uppercase', fontWeight: 700, padding: '6px 16px', borderRadius: 100, border: '1px solid rgba(255,255,255,0.35)' }}>
+          Horse Training with {TRAINER}
+        </div>
       </div>
 
       <div className="ta-page" style={{ maxWidth: 680, margin: '0 auto', padding: '16px 20px 80px' }}>
@@ -502,9 +506,11 @@ function SignedCopy({ form, signature, signedAt }) {
   const h = { fontFamily: "'Montserrat', sans-serif", fontSize: 14, fontWeight: 800, color: BRAND.black, margin: '18px 0 6px' };
   return (
     <div>
-      <div style={{ textAlign: 'center', marginBottom: 18 }}>
-        <img src="/logo-dark.png" alt="Laska Legacy" style={{ height: 36, marginBottom: 8 }} />
-        <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 20, fontWeight: 800, margin: 0 }}>{DAYS}-Day Training &amp; Correction Agreement</h1>
+      <div style={{ textAlign: 'center', marginBottom: 18, paddingBottom: 16, borderBottom: `3px solid ${BRAND.teal}` }}>
+        <img src="/logo-icon.png" alt="Laska Legacy" style={{ display: 'block', margin: '0 auto 6px', height: 72, width: 72 }} />
+        <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 24, fontWeight: 800, letterSpacing: 5, textTransform: 'uppercase' }}>Laska Legacy</div>
+        <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 12.5, fontStyle: 'italic', color: BRAND.teal, margin: '4px 0 14px' }}>More than a horse, a lasting legacy</div>
+        <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, margin: 0 }}>{DAYS}-Day Training &amp; Correction Agreement</h1>
       </div>
 
       <h3 style={h}>Parties</h3>
@@ -540,6 +546,7 @@ function SignedCopy({ form, signature, signedAt }) {
         </div>
       </div>
       <p style={{ fontSize: 11, color: BRAND.grey, marginTop: 14 }}>Agreement version {CONTRACT_VERSION}</p>
+      <p style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 11.5, fontStyle: 'italic', color: BRAND.teal, textAlign: 'center', marginTop: 18 }}>Laska Legacy — more than a horse, a lasting legacy</p>
     </div>
   );
 }
