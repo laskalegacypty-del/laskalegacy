@@ -594,6 +594,17 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
     setAdminAuth(false); setAdminPass(""); setPage("admin");
   };
 
+  // Count a blog post view once per post per browser tab session (never from the admin page).
+  useEffect(() => {
+    if (adminMode || page !== "blog-post" || !selectedPost?.id) return;
+    const key = "ll_viewed_" + selectedPost.id;
+    try {
+      if (window.sessionStorage.getItem(key)) return;
+      window.sessionStorage.setItem(key, "1");
+    } catch {}
+    db.trackBlogView(selectedPost.id);
+  }, [adminMode, page, selectedPost?.id]);
+
   // Counts that live behind the server API (training contracts, website briefs) for the dashboard badges.
   useEffect(() => {
     if (!adminMode || !adminAuth) return;
@@ -1653,7 +1664,7 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32, flexWrap: "wrap", gap: 16 }}>
             <div>
               <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 28, color: BRAND.black, fontWeight: 800 }}>Between the Poles</h1>
-              <p style={{ fontSize: 13, color: BRAND.grey }}>{blogPosts.length} post{blogPosts.length !== 1 ? "s" : ""}</p>
+              <p style={{ fontSize: 13, color: BRAND.grey }}>{blogPosts.length} post{blogPosts.length !== 1 ? "s" : ""} {"\u00B7"} {blogPosts.reduce((n, p) => n + (p.view_count || 0), 0).toLocaleString("en-ZA")} total views</p>
             </div>
             <button className="ll-btn ll-btn-primary ll-btn-sm" onClick={() => navigate("admin-blog-edit", { id: "", title: "", excerpt: "", body: "", coverImage: "", images: [], videos: [], published: true })}>{Icons.plus} New Post</button>
           </div>
@@ -1670,6 +1681,10 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 700, color: BRAND.black, fontSize: 14 }}>{post.title}</div>
                 <div style={{ fontSize: 12, color: BRAND.grey }}>{formatPostDate(post.date, { day: "numeric", month: "short", year: "numeric" }) || "No date"} {"·"} {post.images?.length || 0} photo{(post.images?.length || 0) !== 1 ? "s" : ""} {"\u00B7"} {post.videos?.length || 0} video{(post.videos?.length || 0) !== 1 ? "s" : ""}</div>
+              </div>
+              <div title="Times this post has been opened" style={{ textAlign: "center", minWidth: 64, padding: "4px 10px", borderRadius: 10, background: BRAND.tealLight, flexShrink: 0 }}>
+                <div style={{ fontFamily: "'Montserrat', sans-serif", fontSize: 18, fontWeight: 800, color: BRAND.tealDark, lineHeight: 1.1 }}>{(post.view_count || 0).toLocaleString("en-ZA")}</div>
+                <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", color: BRAND.tealDark }}>views</div>
               </div>
               <button className="icon-btn" title="Copy shareable link" onClick={e => { e.stopPropagation(); const url = window.location.origin + postPath(post); (navigator.clipboard?.writeText(url) || Promise.reject()).then(() => showToast("Link copied"), () => window.prompt("Copy this link", url)); }}>{"🔗"}</button>
               <button className="icon-btn" onClick={e => { e.stopPropagation(); navigate("admin-blog-edit", { ...post }); }}>{Icons.edit}</button>
