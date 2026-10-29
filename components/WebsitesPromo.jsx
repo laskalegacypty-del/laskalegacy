@@ -1,6 +1,7 @@
 'use client';
 
 import { BRAND } from '@/components/websites/ui';
+import ReviewsPanel from '@/components/ReviewsPanel';
 import { PRICE_ZAR } from '@/lib/websites/schema';
 
 const WHATSAPP = 'https://wa.me/27725858288?text=' + encodeURIComponent('Hi! I would like to know more about the R500 website.');
@@ -147,8 +148,10 @@ export default function WebsitesPromo({ onStart }) {
         </div>
       </section>
 
+      <ReviewsPanel background={BRAND.offWhite} />
+
       {/* FAQ */}
-      <section style={{ padding: '64px 24px', background: BRAND.offWhite }}>
+      <section style={{ padding: '64px 24px', background: BRAND.white }}>
         <div className="wp-faq" style={{ maxWidth: 760, margin: '0 auto' }}>
           <h2 style={{ ...h2, textAlign: 'center', marginBottom: 24 }}>Questions? Answered.</h2>
           {FAQ.map(([q, a]) => (

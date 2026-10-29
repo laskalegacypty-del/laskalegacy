@@ -22,6 +22,7 @@ const ICON_PATHS = {
   image: 'M3 5h18v14H3V5zM8.5 10a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM21 16l-5-5-8 8',
   mail: 'M4 5h16v14H4V5zM4 7l8 6 8-6',
   contract: 'M14 3H6v18h12V7l-4-4zM14 3v4h4M9 13h6M9 17h4',
+  star: 'M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1L3.2 9.5l6.1-.9L12 3z',
   globe: 'M12 21a9 9 0 100-18 9 9 0 000 18zM3 12h18M12 3a14 14 0 010 18M12 3a14 14 0 000 18',
   help: 'M12 21a9 9 0 100-18 9 9 0 000 18zM9.5 9a2.5 2.5 0 114 2c-.8.6-1.5 1-1.5 2M12 17h.01',
   ticket: 'M3 8a2 2 0 002-2h14a2 2 0 002 2v2a2 2 0 000 4v2a2 2 0 00-2 2H5a2 2 0 00-2-2v-2a2 2 0 000-4V8zM13 6v12',
@@ -77,6 +78,7 @@ export const NAV_GROUPS = [
     items: [
       { key: 'admin-training', icon: 'contract', label: 'Training Contracts', desc: 'Signed training agreements. Review, approve or decline.' },
       { key: 'admin-websites', icon: 'globe', label: 'Website Briefs', desc: 'R500 one page website requests from clients.' },
+      { key: 'admin-reviews', icon: 'star', label: 'Reviews', desc: 'Customer reviews from /review. Approve them to show on the site.' },
     ],
   },
   {

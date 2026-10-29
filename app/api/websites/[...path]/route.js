@@ -8,6 +8,8 @@ import * as adminList from '@/lib/websites/routes/admin-list';
 import * as adminItem from '@/lib/websites/routes/admin-item';
 import * as trainingList from '@/lib/websites/routes/training-list';
 import * as trainingItem from '@/lib/websites/routes/training-item';
+import * as reviews from '@/lib/websites/routes/reviews';
+import * as reviewsAdmin from '@/lib/websites/routes/reviews-admin';
 
 export const runtime = 'nodejs';
 
@@ -22,6 +24,8 @@ const FIXED = {
   'payfast/notify': payfastNotify,
   'admin/list': adminList,
   'training/list': trainingList,
+  'reviews': reviews,
+  'reviews/admin': reviewsAdmin,
 };
 
 function dispatch(method) {
@@ -35,6 +39,9 @@ function dispatch(method) {
     } else if (!mod && params.path?.length === 2 && params.path[0] === 'training') {
       mod = trainingItem;
       ctx = { params: { id: params.path[1] } };
+    } else if (!mod && params.path?.length === 3 && params.path[0] === 'reviews' && params.path[1] === 'admin') {
+      mod = reviewsAdmin;
+      ctx = { params: { id: params.path[2] } };
     }
     const handler = mod?.[method];
     if (!handler) return NextResponse.json({ error: 'Not found.' }, { status: 404 });

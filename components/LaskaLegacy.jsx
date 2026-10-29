@@ -11,6 +11,8 @@ import { TAB_PATHS, PATH_TABS } from "@/lib/tabs";
 import { postPath, findPost } from "@/lib/blogSlug";
 import AdminWebsites from "@/components/AdminWebsites";
 import AdminTrainingAgreements from "@/components/AdminTrainingAgreements";
+import AdminReviews from "@/components/AdminReviews";
+import ReviewsPanel from "@/components/ReviewsPanel";
 import { AdminLogin, AdminSidebar, AdminDashboard } from "@/components/AdminChrome";
 
 const ADMIN_PASSWORD = "Laska308#";
@@ -570,7 +572,7 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
   const [customCategories, setCustomCategories] = useState({});
   const [customSubcategories, setCustomSubcategories] = useState({});
   const [adminChecked, setAdminChecked] = useState(!adminMode);
-  const [apiCounts, setApiCounts] = useState({ training: null, briefs: null });
+  const [apiCounts, setApiCounts] = useState({ training: null, briefs: null, reviews: null });
 
   // Admin stays signed in for this browser tab only (cleared when the tab closes or you sign out).
   useEffect(() => {
@@ -616,6 +618,7 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
         .catch(() => {});
     get("/api/websites/training/list", "training", (j) => j.agreements.filter((a) => a.status === "signed").length);
     get("/api/websites/admin/list", "briefs", (j) => j.submissions.filter((x) => x.status === "new").length);
+    get("/api/websites/reviews/admin", "reviews", (j) => j.reviews.filter((x) => x.status === "pending").length);
     return () => { cancelled = true; };
   }, [adminMode, adminAuth, adminPass, page]);
 
@@ -1068,7 +1071,7 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
       {adminMode && (
         <AdminSidebar
           page={page}
-          badges={{ "admin-orders": orders.filter((o) => o.status === "new").length, "admin-training": apiCounts.training, "admin-websites": apiCounts.briefs }}
+          badges={{ "admin-orders": orders.filter((o) => o.status === "new").length, "admin-training": apiCounts.training, "admin-websites": apiCounts.briefs, "admin-reviews": apiCounts.reviews }}
           onNavigate={navigate}
           onSignOut={handleAdminSignOut}
         />
@@ -1232,6 +1235,8 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
               <button className="ll-btn ll-btn-primary" onClick={() => navigate("contact")}>Say Hello</button>
             </div>
           </section>
+
+          <ReviewsPanel />
         </div>
       )}
 
@@ -1588,6 +1593,7 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
             { key: "admin-orders", count: orders.filter((o) => o.status === "new").length, label: "New orders", hint: "Open orders", color: BRAND.teal },
             { key: "admin-training", count: apiCounts.training || 0, label: "Training contracts to review", hint: "Review and approve", color: BRAND.purple },
             { key: "admin-websites", count: apiCounts.briefs || 0, label: "New website requests", hint: "See the briefs", color: "#d97706" },
+            { key: "admin-reviews", count: apiCounts.reviews || 0, label: "Reviews to approve", hint: "Approve or hide", color: BRAND.teal },
           ]}
           onNavigate={navigate}
           onSignOut={handleAdminSignOut}
@@ -1826,6 +1832,9 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
       {/* ADMIN WMG QUIZ — list */}
       {page === "admin-training" && adminAuth && (
         <AdminTrainingAgreements password={adminPass} onBack={() => navigate("admin")} showToast={showToast} />
+      )}
+      {page === "admin-reviews" && adminAuth && (
+        <AdminReviews password={adminPass} onBack={() => navigate("admin")} showToast={showToast} />
       )}
       {page === "admin-websites" && adminAuth && (
         <AdminWebsites password={adminPass} onBack={() => navigate("admin")} showToast={showToast} />
