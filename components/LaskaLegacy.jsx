@@ -12,7 +12,7 @@ import { postPath, findPost } from "@/lib/blogSlug";
 import AdminWebsites from "@/components/AdminWebsites";
 import AdminTrainingAgreements from "@/components/AdminTrainingAgreements";
 import AdminReviews from "@/components/AdminReviews";
-import ReviewsPanel from "@/components/ReviewsPanel";
+import ReviewsPanel, { ReviewsBadge } from "@/components/ReviewsPanel";
 import { AdminLogin, AdminSidebar, AdminDashboard } from "@/components/AdminChrome";
 
 const ADMIN_PASSWORD = "Laska308#";
@@ -1111,6 +1111,7 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
             <div style={{ position: "absolute", inset: 0, opacity: 0.08, background: `radial-gradient(ellipse at 30% 50%, ${BRAND.teal}, transparent 60%), radial-gradient(ellipse at 70% 50%, ${BRAND.purple}, transparent 60%)` }} />
             <div style={{ position: "relative", maxWidth: 720, margin: "0 auto" }} className="fade-up">
               <img src={LOGO_WHITE} alt="Laska Legacy" style={{ height: 72, marginBottom: 28, filter: "drop-shadow(0 4px 20px rgba(0,151,178,0.3))" }} />
+              <div><ReviewsBadge /></div>
               <h1 style={{ fontFamily: "'Montserrat', sans-serif", fontSize: "clamp(32px, 6vw, 58px)", color: BRAND.white, fontWeight: 900, lineHeight: 1.1, marginBottom: 20, letterSpacing: -1 }}>
                 Leather & Canvas<br /><span style={{ color: BRAND.teal, fontWeight: 700 }}>for Horse & Rider</span>
               </h1>
@@ -1123,6 +1124,8 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
               </div>
             </div>
           </section>
+
+          <ReviewsPanel background={BRAND.offWhite} title="Reviews for our products & services" subtitle="Real words from the riders, owners and businesses we work with." />
 
           {activeSale && (
             <section
@@ -1236,7 +1239,6 @@ export default function LaskaLegacy({ initialPage = "home", initialPostId = null
             </div>
           </section>
 
-          <ReviewsPanel />
         </div>
       )}
 

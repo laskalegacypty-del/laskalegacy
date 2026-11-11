@@ -59,7 +59,7 @@ export default function ReviewForm() {
               <p style={{ color: BRAND.grey, margin: '0 0 24px', lineHeight: 1.5 }}>It takes less than a minute. Thank you for helping us grow.</p>
 
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>How was your experience? <span style={{ color: BRAND.red }}>*</span></div>
+                <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>How was your experience with our products or services? <span style={{ color: BRAND.red }}>*</span></div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onMouseLeave={() => setHover(0)}>
                   {[1, 2, 3, 4, 5].map((n) => (
                     <button key={n} type="button" aria-label={`${n} star${n === 1 ? '' : 's'}`} aria-pressed={rating === n}
@@ -73,7 +73,7 @@ export default function ReviewForm() {
 
               <TextField label="Your name" required value={name} onChange={setName} maxLength={80} error={errors.name} />
               <TextField label="Business or horse (optional)" value={business} onChange={setBusiness} maxLength={100} />
-              <TextAreaField label="Your review" required value={message} onChange={setMessage} maxLength={1000} rows={5} error={errors.message} placeholder="Tell us what you liked..." />
+              <TextAreaField label="Your review" required value={message} onChange={setMessage} maxLength={1000} rows={5} error={errors.message} placeholder="Which product or service, and what did you like?" />
 
               {/* Honeypot: hidden from people, bots fill it in */}
               <div aria-hidden="true" style={{ position: 'absolute', left: -9999, width: 1, height: 1, overflow: 'hidden' }}>
