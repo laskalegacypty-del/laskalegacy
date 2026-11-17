@@ -1,0 +1,326 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Birthday Breakfast Roundup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rye&family=Alfa+Slab+One&family=Special+Elite&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f1dfb8; --bg2:#d9b878; --card:#fbf1d8; --ink:#3a2412; --muted:#7a5a3a; --line:#b98f55;
+  --accent:#b23a1e; --accent-d:#7d2410; --accent-soft:#f3d2a4; --gold:#d9a321; --leather:#5b3a1e; --leather-d:#3b2412;
+  --shadow:0 5px 0 rgba(59,36,18,.25);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:radial-gradient(circle at 50% 0,var(--bg),var(--bg2));background-attachment:fixed;color:var(--ink);font:16px/1.5 "Special Elite",Georgia,serif;overflow-x:hidden}
+body::before{content:"";position:fixed;inset:0;background:repeating-linear-gradient(0deg,rgba(91,58,30,.04) 0 2px,transparent 2px 5px);pointer-events:none;z-index:0}
+.float{position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0}
+.float span{position:absolute;font-size:36px;opacity:.18;animation:bob 7s ease-in-out infinite}
+@keyframes bob{50%{transform:translateY(-16px) rotate(8deg)}}
+.app{position:relative;z-index:1;max-width:600px;margin:0 auto;min-height:100vh;min-height:100dvh;display:flex;flex-direction:column;padding:0 14px}
+.progress{height:14px;background:var(--leather-d);border:2px solid var(--leather-d);border-radius:99px;margin:16px 0 0;overflow:hidden;box-shadow:inset 0 2px 3px rgba(0,0,0,.4)}
+.progress i{display:block;height:100%;width:0;background:repeating-linear-gradient(45deg,var(--gold) 0 10px,#f0c04a 10px 20px);border-radius:99px;transition:width .4s}
+.count{font-size:14px;color:var(--leather);text-align:center;margin-top:6px;min-height:22px;font-weight:bold}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;padding:10px 0 130px}
+.page{animation:pop .35s cubic-bezier(.2,1.2,.4,1)}
+@keyframes pop{from{opacity:0;transform:translateY(18px) scale(.97)}}
+.emoji{font-size:64px;text-align:center;animation:wiggle 2.4s ease-in-out infinite;display:block}
+@keyframes wiggle{0%,100%{transform:rotate(-6deg)}50%{transform:rotate(6deg) scale(1.08)}}
+h1,h2{font-family:Rye,"Alfa Slab One",serif;font-weight:400;text-align:center;line-height:1.15;margin:8px 0;color:var(--leather-d);text-shadow:2px 2px 0 rgba(217,163,33,.5)}
+h1{font-size:clamp(34px,9vw,52px)} h2{font-size:clamp(24px,6.5vw,32px)}
+.lead{text-align:center;color:var(--muted);margin:0 auto 18px;max-width:420px}
+.sub{font-size:14px;color:var(--muted);text-align:center;margin:-2px 0 14px}
+.poster{background:var(--card);border:4px double var(--leather);border-radius:6px;padding:22px 16px;box-shadow:var(--shadow);text-align:center}
+.poster small{display:block;font-family:"Alfa Slab One",serif;letter-spacing:.2em;color:var(--accent);font-size:15px}
+input[type=text],textarea{width:100%;padding:14px 16px;border:3px solid var(--leather);border-radius:8px;background:var(--card);color:var(--ink);font:inherit;font-size:18px}
+input:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px var(--accent-soft)}
+textarea{font-size:16px;min-height:90px;resize:vertical}
+.big-input{text-align:center;font-size:24px!important;font-family:"Alfa Slab One",serif!important}
+
+/* category tabs */
+.tabwrap{position:sticky;top:0;z-index:4;margin:0 -2px;padding:10px 2px 0;background:linear-gradient(var(--bg) 85%,transparent)}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 2px 0;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tscroll{display:block;width:100%;height:30px;margin:4px 0 6px;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer;touch-action:pan-x}
+.tscroll::-webkit-slider-runnable-track{height:12px;border-radius:99px;background:var(--leather-d);border:2px solid var(--leather-d);box-shadow:inset 0 2px 3px rgba(0,0,0,.5)}
+.tscroll::-moz-range-track{height:8px;border-radius:99px;background:var(--leather-d);border:2px solid var(--leather-d)}
+.tscroll::-webkit-slider-thumb{-webkit-appearance:none;width:64px;height:26px;margin-top:-9px;border-radius:99px;background:var(--gold);border:3px solid var(--leather-d);box-shadow:0 3px 0 var(--accent-d)}
+.tscroll::-moz-range-thumb{width:58px;height:20px;border-radius:99px;background:var(--gold);border:3px solid var(--leather-d)}
+.tscroll:focus{outline:none}
+.tab{flex:0 0 auto;display:flex;align-items:center;gap:6px;padding:9px 14px;border:3px solid var(--leather);border-bottom:0;border-radius:10px 10px 0 0;background:var(--accent-soft);color:var(--leather-d);font:inherit;font-weight:bold;font-size:15px;cursor:pointer;white-space:nowrap}
+.tab.on{background:var(--leather);color:#fbe9bf}
+.tab .b{background:var(--accent);color:#fff;border-radius:99px;font-size:12px;min-width:20px;padding:0 6px;text-align:center}
+.panel{border:3px solid var(--leather);border-radius:0 8px 8px 8px;background:rgba(251,241,216,.55);padding:14px 12px 6px;margin-bottom:6px}
+.cathead{text-align:center;margin:0 0 12px}
+.cathead b{font-family:Rye,serif;font-weight:400;font-size:24px;display:block;color:var(--leather-d)}
+.cathead span{font-size:14px;color:var(--muted)}
+
+.item{display:flex;align-items:center;gap:10px;background:var(--card);border:3px solid var(--leather);border-radius:8px;padding:11px 13px;margin-bottom:9px;box-shadow:var(--shadow);transition:.15s}
+.item.on{background:var(--accent-soft);border-color:var(--accent)}
+.item .nm{flex:1;min-width:0;font-weight:bold;line-height:1.25}
+.item .pr{color:var(--muted);font-size:14px;white-space:nowrap}
+.qty{display:flex;align-items:center;gap:8px}
+.qty button{width:38px;height:38px;border-radius:50%;border:3px solid var(--leather-d);background:var(--gold);color:var(--leather-d);font:bold 22px/1 "Alfa Slab One",serif;cursor:pointer;transition:transform .1s}
+.qty button:active{transform:scale(.85)}
+.qty button.minus{background:var(--card)}
+.qty .n{min-width:20px;text-align:center;font-weight:bold;font-size:19px}
+.skip{text-align:center;color:var(--muted);font-size:14px;margin-top:8px}
+
+.line{background:var(--card);border:3px solid var(--leather);border-radius:8px;padding:12px 14px;margin-bottom:10px}
+.line .t{font-weight:bold}
+.line input[type=text]{margin-top:8px;padding:10px 12px;font-size:15px;border-width:2px}
+.share{display:flex;align-items:center;gap:10px;margin-top:10px;font-weight:bold;cursor:pointer}
+.share input{width:22px;height:22px;accent-color:var(--accent)}
+.hint{font-size:12.5px;color:var(--muted);margin-top:4px}
+.rev{background:var(--card);border:4px double var(--leather);border-radius:6px;padding:14px 16px;box-shadow:var(--shadow)}
+.rev .r{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-bottom:2px dotted var(--line)}
+.rev .r:last-child{border:0}
+.rev small{color:var(--muted);display:block}
+.total{display:flex;justify-content:space-between;font-family:"Alfa Slab One",serif;font-size:20px;margin-top:10px;padding-top:10px;border-top:3px solid var(--leather-d)}
+.err{background:#f6c9bd;color:#7d1a0a;border:2px solid var(--accent);border-radius:8px;padding:10px 14px;margin-top:12px;display:none;text-align:center}
+.empty{text-align:center;color:var(--muted);padding:14px}
+
+.nav{position:fixed;left:0;right:0;bottom:0;z-index:6;padding:12px 14px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(transparent,var(--bg2) 45%)}
+.nav div{max-width:600px;margin:0 auto;display:flex;gap:10px}
+.btn{flex:1;padding:15px;border:3px solid var(--leather-d);border-radius:10px;font:400 20px Rye,serif;cursor:pointer;background:var(--accent);color:#fbe9bf;box-shadow:0 6px 0 var(--accent-d);transition:transform .08s,box-shadow .08s}
+.btn:active{transform:translateY(4px);box-shadow:0 2px 0 var(--accent-d)}
+.btn:disabled{opacity:.6}
+.btn.back{flex:0 0 auto;background:var(--card);color:var(--leather-d);box-shadow:0 6px 0 var(--leather);padding:15px 22px}
+.btn.back:active{box-shadow:0 2px 0 var(--leather)}
+
+/* success */
+#done{position:fixed;inset:0;z-index:20;display:none;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;background:radial-gradient(circle at 50% 30%,#e0a53a,#b23a1e 70%,#5b1a0c);color:#fbe9bf;overflow:auto}
+#done h1{color:#fff3cf;font-size:clamp(36px,11vw,68px);text-shadow:0 4px 0 rgba(0,0,0,.35)}
+#done .huge{font-size:100px;animation:bounce 1s infinite}
+@keyframes bounce{50%{transform:translateY(-22px) rotate(-8deg) scale(1.1)}}
+#done p{font-size:20px;max-width:420px;margin:6px auto 18px}
+#done ul{list-style:none;padding:14px 18px;margin:0 auto 20px;background:rgba(251,233,191,.18);border:3px dashed #fbe9bf;border-radius:8px;text-align:left;max-width:420px;width:100%}
+#done li{padding:3px 0;font-weight:bold}
+#done .btn{flex:none;background:#fbe9bf;color:var(--accent-d);box-shadow:0 6px 0 rgba(0,0,0,.35);max-width:360px;width:100%}
+canvas#confetti{position:fixed;inset:0;pointer-events:none;z-index:30}
+
+.guest{background:var(--card);border:3px solid var(--leather);border-radius:8px;padding:10px 14px;margin-bottom:8px}
+.guest ul{margin:4px 0 0;padding-left:18px;color:var(--muted);font-size:14px}
+.tally{display:flex;justify-content:space-between;padding:6px 0;border-bottom:2px dotted var(--line)}
+</style>
+</head>
+<body>
+<div class="float" aria-hidden="true">
+  <span style="left:6%;top:12%">🌵</span><span style="left:84%;top:18%;animation-delay:-2s">🐎</span>
+  <span style="left:12%;top:70%;animation-delay:-4s">🤠</span><span style="left:80%;top:75%;animation-delay:-1s">⭐</span>
+  <span style="left:46%;top:6%;animation-delay:-3s">🥓</span><span style="left:50%;top:88%;animation-delay:-5s">🌵</span>
+</div>
+
+<div class="app" id="app">
+  <div class="progress"><i id="bar"></i></div>
+  <div class="count" id="count"></div>
+  <main id="stage"></main>
+</div>
+
+<div class="nav" id="nav"><div>
+  <button class="btn back" id="back" aria-label="Back">←</button>
+  <button class="btn" id="next">Next</button>
+</div></div>
+
+<div id="done" role="status">
+  <div class="huge">🤠</div>
+  <h1 id="doneTitle">Order taken!</h1>
+  <p>Yeehaw! Your grub is rustled up. Now saddle up and go be hungry. 🥓</p>
+  <ul id="doneList"></ul>
+  <button class="btn" id="again">Order for another cowpoke 🐴</button>
+</div>
+<canvas id="confetti"></canvas>
+
+<script>
+const MENU = [
+  {k:"Breakfast", i:"🍳", s:"Bosboer power to start the day", items:[["Bosboer Ontbyt",95],["Bosboer Omelet",95],["Mini Bosboer",69],["Rogbrood (toast swop)",12],["Surdeegbrood (toast swop)",15]]},
+  {k:"Burgers", i:"🍔", s:"Served with chips or slaai and onion rings", items:[["Crumbed Chicken Burger",129],["Beef Burger",129],["Dubbel Beef Burger",159],["Hoender Spek & Kaas Burger",159],["Beef, Spek & Kaas Burger",149],["Hoender & Pynappel Burger",149],["Beef & Pynappel Burger",149],["Beef Banting-Burger",139]]},
+  {k:"Vleis", i:"🥩", s:"Grills come with chips, slaai, pap or onion rings", items:[["Steak Egg & Chips",119],["350g Rump",169],["350g T-Been",149],["500g T-Been",169],["500g Rump Plankie Steak",195],["350g Ribeye",185],["Rack of Ribs",279],["Eisbein",169],["Hoender Schnitzel",149],["Pap, Eier en Wors",89],["Chicken Livers",115]]},
+  {k:"Mandjies", i:"🧺", s:"Choose your sauce on the notes page", items:[["Bosboer Mandjie",229],["'n Mandjie",140],["'n Hoendermandjie",140]]},
+  {k:"Vis", i:"🐟", s:"Fresh from the creek", items:[["Hake & Chips",149],["Calamari (top up)",49]]},
+  {k:"Toasties", i:"🥪", s:"Served with chips or slaai", items:[["Ham, Kaas & Tamatie",69],["Ham & Kaas",69],["Hoender & Mayo",69],["Spek, Eier & Kaas",72]]},
+  {k:"Pizza", i:"🍕", s:"Pizza for breakfast? Legend.", items:[["Focaccia",128],["Regina",139],["Hawaiian",139],["Sweet Chilli Chicken",149],["Chicken Mayo",149],["Chicken Liver",149],["Meaty",179],["Biltong",179],["Steak",179],["Moerby (Moer alles by)",179]]},
+  {k:"Kiddies", i:"🧒", s:"All R69, for the little buckaroos", items:[["Kaas Pizza",69],["Hawaiian Pizza",69],["Ham & Kaas Pizza",69],["Kiddies Beef Burger",69],["Kiddies Hoender Burger",69],["Chicken Strips & Chips",69],["Kaasworsies & Chips",69]]},
+  {k:"Ekstra", i:"🍟", s:"Sides to fill the saddlebags", items:[["Klein Chips",49],["Groot Chips",69],["Krummelpap & Sous",45],["Slaai",45],["10x Uie Ringe",59],["Braai Broodjie",45],["4x Jalapeño Poppers",49]]},
+  {k:"Souse", i:"🫕", s:"About R30 each", items:[["Mushroom Sous",30],["Kaas Sous",30],["Pepper Sous",30],["Knoffel Sous",30],["Sweet Chilli Sous",30]]},
+  {k:"Nagereg", i:"🍮", s:"Save room for dessert, partner", items:[["Malva Pudding (with roomys & vla)",69],["Wafels (with roomys)",59],["Roomys & Choc Sous",45]]},
+  {k:"Doggy Menu", i:"🐶", s:"For the trusty four-legged deputies", items:[["Hoender & Pap",25],["Vra vir 'n been",null]]},
+];
+const PAGES = ["welcome","name","menu","details","review"];
+const $ = s => document.querySelector(s);
+const R = n => "R" + (Math.round(n*100)/100).toString().replace(/\.0+$/,"");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+let step = 0, tab = 0, name = "", notes = "", cart = [];
+const splitCount = l => !l.shared ? 1 : 1 + Math.max(1, l.sharedWith.split(/,|&|\band\b|\ben\b|\+/i).map(s=>s.trim()).filter(Boolean).length);
+const lineCost = l => l.price==null ? 0 : l.price*l.qty/splitCount(l);
+const qtyOf = n => (cart.find(c=>c.name===n)||{qty:0}).qty;
+const itemCount = () => cart.reduce((s,l)=>s+l.qty,0);
+const total = () => cart.reduce((s,l)=>s+lineCost(l),0);
+const catCount = c => c.items.reduce((s,[n])=>s+qtyOf(n),0);
+
+function change(n,p,d){
+  let l = cart.find(c=>c.name===n);
+  if(!l){ if(d<0) return; l={name:n,price:p,qty:0,note:"",shared:false,sharedWith:""}; cart.push(l); }
+  l.qty = Math.min(20,l.qty+d);
+  if(l.qty<=0) cart = cart.filter(c=>c!==l);
+}
+function buzz(){ try{navigator.vibrate&&navigator.vibrate(12)}catch{} }
+
+function render(keep){
+  const id = PAGES[step], st = $("#stage");
+  const tabScroll = keep && $(".tabs") ? $(".tabs").scrollLeft : 0, y = scrollY;
+  $("#bar").style.width = (step/(PAGES.length-1)*100)+"%";
+  $("#count").textContent = itemCount() ? `🛒 ${itemCount()} item${itemCount()>1?"s":""} · ${R(total())}` : "";
+  $("#back").style.display = step===0 ? "none" : "block";
+  $("#stage").style.justifyContent = id==="menu" ? "flex-start" : "center";
+  const next = $("#next"); next.textContent = "Next →";
+  let h = "";
+
+  if(id==="welcome"){
+    h = `<span class="emoji">🤠</span>
+      <div class="poster"><small>★ WANTED ★</small><h1>Birthday Breakfast</h1><p class="lead" style="margin:6px auto 0">Hungry cowpokes needed! Rustle up your order before we ride into town, so the grub lands faster than a tumbleweed in a gale.</p></div>`;
+    next.textContent = "Howdy! Let's ride 🐎";
+  } else if(id==="name"){
+    h = `<span class="emoji">🌵</span><h2>Howdy, partner! What do they call ya?</h2>
+      <p class="sub">So the waiter knows whose plate is whose</p>
+      <input id="nameIn" class="big-input" type="text" maxlength="60" placeholder="Your name" autocomplete="name" value="${esc(name)}">
+      <div class="err" id="err"></div>`;
+  } else if(id==="menu"){
+    const c = MENU[tab];
+    h = `<h2>Pick your grub 🍳</h2>
+      <div class="tabwrap"><div class="tabs" id="tabs">${MENU.map((m,i)=>`<button class="tab ${i===tab?"on":""}" data-tab="${i}">${m.i} ${m.k}${catCount(m)?`<span class="b">${catCount(m)}</span>`:""}</button>`).join("")}</div>
+      <input type="range" class="tscroll" id="tscroll" min="0" max="100" value="0" step="1" aria-label="Scroll categories"></div>
+      <div class="panel">
+        <div class="cathead"><b>${c.i} ${c.k}</b><span>${c.s}</span></div>` +
+      c.items.map(([n,p])=>`<div class="item ${qtyOf(n)?"on":""}">
+        <div class="nm">${esc(n)}</div><div class="pr">${p==null?"ask":R(p)}</div>
+        <div class="qty" data-n="${esc(n)}" data-p="${p==null?"":p}">
+          ${qtyOf(n)?`<button class="minus" data-d="-1" aria-label="Remove one">−</button><span class="n">${qtyOf(n)}</span>`:""}
+          <button data-d="1" aria-label="Add one">+</button>
+        </div></div>`).join("") + `</div>
+      <div class="skip">Flick through the tabs, then hit Next when you're done 🤠</div>`;
+  } else if(id==="details"){
+    if(!cart.length){ h = `<span class="emoji">🤔</span><h2>Your plate is emptier than a ghost town!</h2><p class="lead">Ride back and pick at least one thing, or you'll be watching everyone else eat.</p>`; next.textContent="Back to the menu ←"; }
+    else h = `<span class="emoji">📜</span><h2>Any special requests?</h2>
+      <p class="sub">Sauce, side, how you like it done. Tick it if you're sharing!</p>` +
+      cart.map((l,i)=>`<div class="line" data-i="${i}">
+        <div class="t">${l.qty}× ${esc(l.name)}</div>
+        <input type="text" data-f="note" maxlength="200" placeholder="Notes (e.g. mushroom sauce, medium-rare)" value="${esc(l.note)}">
+        <label class="share"><input type="checkbox" data-f="shared" ${l.shared?"checked":""}> 🤝 I'm sharing this</label>
+        ${l.shared?`<input type="text" data-f="sharedWith" maxlength="100" placeholder="Sharing with who?" value="${esc(l.sharedWith)}">
+        <div class="hint">Cost split ${splitCount(l)} ways. Your sharing buddy should add it to their order too.</div>`:""}
+      </div>`).join("") +
+      `<textarea id="notesIn" maxlength="300" placeholder="Allergies or anything else? (optional)">${esc(notes)}</textarea>`;
+  } else if(id==="review"){
+    h = `<span class="emoji">🧐</span><h2>Lookin' good, ${esc(name||"partner")}!</h2><p class="sub">Check your order, then send it in</p>
+      <div class="rev">${cart.map(l=>`<div class="r"><div>${l.qty}× ${esc(l.name)}<small>${l.shared?"🤝 sharing"+(l.sharedWith?" with "+esc(l.sharedWith):""):""}${l.note?(l.shared?" · ":"")+esc(l.note):""}</small></div><div>${l.price==null?"":R(lineCost(l))}</div></div>`).join("")}
+      <div class="total"><span>Estimated total</span><span>${R(total())}</span></div></div>
+      <p class="hint" style="text-align:center">Excludes drinks and tip</p><div class="err" id="err"></div>`;
+    next.textContent = "Send it in! 🤠";
+  }
+  st.innerHTML = `<div class="page" ${keep?'style="animation:none"':""}>${h}</div>`;
+  if(id==="name") setTimeout(()=>$("#nameIn").focus(),150);
+  if(keep){ const tb=$(".tabs"); if(tb){ tb.scrollLeft = tabScroll; const on=$(".tab.on"); if(on) tb.scrollLeft += Math.max(0,on.getBoundingClientRect().right-tb.getBoundingClientRect().right+12) - Math.max(0,tb.getBoundingClientRect().left-on.getBoundingClientRect().left+12); } scrollTo(0,y); }
+  else { scrollTo(0,0); const on=$(".tab.on"); if(on) on.scrollIntoView({inline:"center",block:"nearest"}); }
+  setupTabs();
+}
+// slider under the tabs, kept in sync with the tab bar's scroll position
+function setupTabs(){
+  const tb=$(".tabs"), sl=$("#tscroll"); if(!tb||!sl) return;
+  const sync=()=>{ const m=tb.scrollWidth-tb.clientWidth; sl.max=Math.max(1,Math.round(m)); sl.value=Math.round(tb.scrollLeft); sl.style.visibility=m>2?"visible":"hidden"; };
+  tb.addEventListener("scroll",sync,{passive:true});
+  sl.addEventListener("input",()=>{ tb.scrollLeft=+sl.value; });
+  sync();
+}
+
+$("#stage").addEventListener("click",e=>{
+  const t = e.target.closest("button[data-tab]");
+  if(t){ tab = +t.dataset.tab; render(true); return; }
+  const b = e.target.closest("button[data-d]"); if(!b) return;
+  const q = b.parentElement;
+  change(q.dataset.n, q.dataset.p===""?null:+q.dataset.p, +b.dataset.d);
+  buzz(); render(true);
+});
+$("#stage").addEventListener("input",e=>{
+  if(e.target.id==="nameIn"){ name = e.target.value; return; }
+  if(e.target.id==="notesIn"){ notes = e.target.value; return; }
+  const f = e.target.dataset.f; if(!f) return;
+  const l = cart[+e.target.closest(".line").dataset.i];
+  if(f==="shared"){ l.shared = e.target.checked; render(true); return; }
+  l[f] = e.target.value;
+});
+$("#stage").addEventListener("keydown",e=>{ if(e.key==="Enter" && e.target.id==="nameIn") go(1); });
+
+function showErr(m){ const e=$("#err"); if(e){ e.textContent=m; e.style.display="block"; } }
+
+function go(d){
+  const id = PAGES[step];
+  if(d<0){ step=Math.max(0,step-1); return render(); }
+  if(id==="name" && !name.trim()){ showErr("Pop your name in first, partner 🙂"); return; }
+  if(id==="menu" && !cart.length){ /* allow moving on; details page nudges back */ }
+  if(id==="details" && !cart.length){ step = PAGES.indexOf("menu"); return render(); }
+  if(id==="review") return submit();
+  step++; render();
+}
+$("#next").onclick = ()=>go(1);
+$("#back").onclick = ()=>go(-1);
+
+async function submit(){
+  const btn = $("#next"); btn.disabled = true; btn.textContent = "Sending… 🐎";
+  try{
+    const sb = window.parent && window.parent.__SB;
+    if(!sb) throw new Error("Couldn't reach the kitchen. Reload the page and try again, partner!");
+    const clean=(v,m)=>String(v==null?"":v).replace(/[<>]/g,"").trim().slice(0,m);
+    const items=cart.slice(0,40).map(i=>({name:clean(i.name,80),price:i.price==null?null:Math.max(0,Math.min(2000,Number(i.price)||0)),qty:Math.max(1,Math.min(20,parseInt(i.qty,10)||1)),note:clean(i.note,200),shared:!!i.shared,sharedWith:i.shared?clean(i.sharedWith,100):""}));
+    const row={name:clean(name,60),items,notes:clean(notes,300)};
+    const { error } = await sb.from("birthday_orders").insert(row);
+    if(error) throw new Error("Couldn't send your order. Try again, partner!");
+    const d={order:row};
+    $("#doneTitle").textContent = `Order taken, ${name.trim()}!`;
+    $("#doneList").innerHTML = d.order.items.map(i=>`<li>${i.qty}× ${esc(i.name)}${i.shared?" 🤝":""}</li>`).join("");
+    $("#done").style.display="flex"; $("#nav").style.display="none";
+    confetti();
+  }catch(e){ showErr(e.message); }
+  finally{ btn.disabled=false; btn.textContent="Send it in! 🤠"; }
+}
+$("#again").onclick = ()=>{
+  cart=[]; name=""; notes=""; tab=0; step=1; $("#done").style.display="none"; $("#nav").style.display="block"; render();
+};
+
+// gold-star confetti
+function confetti(){
+  const c=$("#confetti"), x=c.getContext("2d"); c.width=innerWidth; c.height=innerHeight;
+  const cols=["#ffd34d","#f0a830","#fff3cf","#b23a1e","#d9a321","#8b5a2b"];
+  const ps=Array.from({length:150},()=>({x:Math.random()*c.width,y:-20-Math.random()*c.height*.6,s:7+Math.random()*10,vx:-2+Math.random()*4,vy:2+Math.random()*4,r:Math.random()*6,vr:-.15+Math.random()*.3,c:cols[Math.random()*cols.length|0]}));
+  const star=(s)=>{x.beginPath();for(let i=0;i<10;i++){const a=i*Math.PI/5,r=i%2?s*.45:s;x.lineTo(Math.cos(a)*r,Math.sin(a)*r)}x.closePath();x.fill()};
+  let t=0;
+  (function f(){
+    x.clearRect(0,0,c.width,c.height);
+    ps.forEach(p=>{p.x+=p.vx;p.y+=p.vy;p.r+=p.vr;x.save();x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;star(p.s);x.restore()});
+    if(++t<420) requestAnimationFrame(f); else x.clearRect(0,0,c.width,c.height);
+  })();
+}
+
+// Hidden host view: open /birthday/?host to see all orders and a kitchen tally
+if(new URLSearchParams(location.search).has("host")){
+  $("#nav").style.display="none"; $(".progress").style.display="none";
+  $("#stage").innerHTML = `<h2>Host view 🎩</h2><div id="hv" class="empty">Loading…</div>`;
+  Promise.resolve(window.parent.__SB.from("birthday_orders").select("*").order("created_at",{ascending:true})).then(({data,error})=>{ if(error) throw error; const orders=data||[];
+    const t={}; orders.forEach(o=>o.items.forEach(i=>t[i.name]=(t[i.name]||0)+i.qty));
+    const line = i=>`${i.qty}× ${i.name}${i.note?` (${i.note})`:""}${i.shared?` [sharing${i.sharedWith?" with "+i.sharedWith:""}]`:""}`;
+    $("#hv").className="";
+    $("#hv").innerHTML = `<p class="sub">${orders.length} orders</p>` +
+      orders.map(o=>`<div class="guest"><b>${esc(o.name)}</b><ul>${o.items.map(i=>`<li>${esc(line(i))}</li>`).join("")}${o.notes?`<li><em>${esc(o.notes)}</em></li>`:""}</ul></div>`).join("") +
+      `<h2 style="font-size:22px;margin-top:18px">Kitchen tally</h2>` + Object.entries(t).sort((a,b)=>b[1]-a[1]).map(([n,q])=>`<div class="tally"><span>${esc(n)}</span><b>${q}×</b></div>`).join("") +
+      `<button class="btn" id="cp" style="margin-top:16px;width:100%">Copy list for the restaurant</button>`;
+    $("#cp").onclick=()=>{ const s="BREAKFAST ORDERS\n\n"+orders.map(o=>o.name+":\n"+o.items.map(i=>"  - "+line(i)).join("\n")+(o.notes?"\n  Note: "+o.notes:"")).join("\n\n"); navigator.clipboard.writeText(s).then(()=>$("#cp").textContent="Copied ✓"); };
+  }).catch(()=>$("#hv").textContent="Couldn't load orders.");
+} else render();
+</script>
+</body>
+</html>
